@@ -1,0 +1,41 @@
+# Game data: your own copy of Return to Castle Wolfenstein stays on your machine. Never commit it.
+*.pk3
+*.roq
+*.bsp
+*.exe
+*.dll
+*.so
+*.dylib
+*.cdkey
+rtcwkey
+hunkusage.dat
+
+# Local notes
+/*Documentation.txt
+
+# Build output
+/build/
+/build-*/
+/build_host/
+*.nro
+*.nacp
+*.elf
+*.nso
+*.npdm
+*.dksh
+*.map
+*.o
+*.d
+
+# SD card image and console logs: kept as folders, filled locally
+/SD_CARD/*
+!/SD_CARD/README.md
+/SD_LOG/*
+!/SD_LOG/README.md
+
+# Host files
+.DS_Store
+Thumbs.db
+__pycache__/
+.vscode/
+.claude/
