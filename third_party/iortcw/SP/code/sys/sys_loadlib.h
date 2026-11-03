@@ -20,7 +20,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
-#ifdef DEDICATED
+#ifdef __SWITCH__
+	// homebrew loads no libraries: the game modules are part of the executable
+#	define Sys_LoadLibrary(f) NULL
+#	define Sys_UnloadLibrary(h)
+#	define Sys_LoadFunction(h,fn) NULL
+#	define Sys_LibraryError() "not supported"
+#elif defined(DEDICATED)
 #	ifdef _WIN32
 #		include <windows.h>
 #		define Sys_LoadLibrary(f) (void*)LoadLibrary(f)

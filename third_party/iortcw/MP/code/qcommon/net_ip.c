@@ -73,12 +73,21 @@ static qboolean	winsockInitialized = qfalse;
 #	include <sys/types.h>
 #	include <sys/time.h>
 #	include <unistd.h>
-#	if !defined(__sun) && !defined(__sgi)
+#	if !defined(__sun) && !defined(__sgi) && !defined(__SWITCH__)
 #		include <ifaddrs.h>
 #	endif
 
 #	ifdef __sun
 #		include <sys/filio.h>
+#	endif
+
+#	ifdef __SWITCH__
+// libnx's headers leave IPv6 multicast out, and the port opens no IPv6 socket
+struct ipv6_mreq {
+	struct in6_addr ipv6mr_multiaddr;
+	unsigned int ipv6mr_interface;
+};
+#		define if_nametoindex(name) 0
 #	endif
 
 typedef int SOCKET;
@@ -1291,6 +1300,22 @@ static void NET_GetLocalAddress(void)
 		Sys_ShowIP();
 	}
 }
+#elif defined(__SWITCH__)
+static void NET_GetLocalAddress( void ) {
+	struct sockaddr_in addr, mask;
+
+	numIP = 0;
+
+	memset(&addr, 0, sizeof(addr));
+	memset(&mask, 0, sizeof(mask));
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = gethostid();	// libnx: the console's address
+	mask.sin_family = AF_INET;
+	mask.sin_addr.s_addr = htonl(0xFFFFFF00);
+
+	NET_AddLocalAddress("", (struct sockaddr *) &addr, (struct sockaddr *) &mask);
+	Sys_ShowIP();
+}
 #else
 static void NET_GetLocalAddress( void ) {
 	char				hostname[256];
@@ -1424,7 +1449,12 @@ static qboolean NET_GetCvars( void ) {
 #else
 	/* End users have it enabled so they can connect to ipv6-only hosts, but ipv4 will be
 	 * used if available due to ping */
+#ifdef __SWITCH__
+	// no IPv6 on the console
+	net_enabled = Cvar_Get( "net_enabled", "1", CVAR_LATCH | CVAR_ARCHIVE );
+#else
 	net_enabled = Cvar_Get( "net_enabled", "3", CVAR_LATCH | CVAR_ARCHIVE );
+#endif
 #endif
 	modified = net_enabled->modified;
 	net_enabled->modified = qfalse;
@@ -1684,6 +1714,12 @@ void NET_Sleep(int msec)
 	{
 		// windows ain't happy when select is called without valid FDs
 		SleepEx(msec, 0);
+		return;
+	}
+#elif defined(__SWITCH__)
+	if(highestfd == INVALID_SOCKET)
+	{
+		Sys_Sleep(msec);
 		return;
 	}
 #endif

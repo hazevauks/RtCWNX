@@ -44,6 +44,9 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef APIENTRYP
 #define APIENTRYP APIENTRY *
 #endif
+#elif defined(__SWITCH__)
+#	include <GL/gl.h>
+#	include <GL/glext.h>
 #else
 #ifdef USE_LOCAL_HEADERS
 #	include "SDL_opengl.h"

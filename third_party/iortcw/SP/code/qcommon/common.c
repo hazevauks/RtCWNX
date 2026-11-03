@@ -46,8 +46,14 @@ int demo_protocols[] =
 #define MAX_NUM_ARGVS   50
 
 #define MIN_DEDICATED_COMHUNKMEGS 1
+#ifdef __SWITCH__
+// the retail maps' hunk use is listed in hunkusage.dat: 38 MB at most on 32 bits
+#define MIN_COMHUNKMEGS 64
+#define DEF_COMHUNKMEGS 128
+#else
 #define MIN_COMHUNKMEGS		128
 #define DEF_COMHUNKMEGS 	256
+#endif
 #define DEF_COMZONEMEGS		32
 #define DEF_COMHUNKMEGS_S	XSTRING(DEF_COMHUNKMEGS)
 #define DEF_COMZONEMEGS_S	XSTRING(DEF_COMZONEMEGS)

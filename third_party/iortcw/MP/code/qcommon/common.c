@@ -44,8 +44,14 @@ int demo_protocols[] =
 #define MAX_NUM_ARGVS   50
 
 #define MIN_DEDICATED_COMHUNKMEGS 1
+#ifdef __SWITCH__
+// the retail maps' hunk use is listed in hunkusage.dat: 38 MB at most on 32 bits
+#define MIN_COMHUNKMEGS 64
+#define DEF_COMHUNKMEGS 128
+#else
 #define MIN_COMHUNKMEGS 128 // JPW NERVE changed this to 42 for MP, was 56 for team arena and 75 for wolfSP
 #define DEF_COMHUNKMEGS 256 // RF, increased this, some maps are exceeding 56mb // JPW NERVE changed this for multiplayer back to 42, 56 for depot/mp_cpdepot, 42 for everything else
+#endif
 #define DEF_COMZONEMEGS 32 // JPW NERVE cut this back too was 30
 #define DEF_COMHUNKMEGS_S	XSTRING(DEF_COMHUNKMEGS)
 #define DEF_COMZONEMEGS_S	XSTRING(DEF_COMZONEMEGS)

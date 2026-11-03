@@ -165,9 +165,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #endif
 
+//================================================================ SWITCH ===
+
+#ifdef __SWITCH__
+
+#define OS_STRING "switch"
+#define ID_INLINE inline
+#define PATH_SEP '/'
+#define ARCH_STRING "arm64"
+#define Q3_LITTLE_ENDIAN
+#define DLL_EXT ".nro"
+
+#endif
+
 //================================================================= LINUX ===
 
-#if defined(__linux__) || defined(__FreeBSD_kernel__) || defined(__GNU__)
+#if !defined(__SWITCH__) && (defined(__linux__) || defined(__FreeBSD_kernel__) || defined(__GNU__))
 
 #include <endian.h>
 

@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <ctype.h>
 #include <errno.h>
 
-#ifndef DEDICATED
+#if !defined(DEDICATED) && !defined(__SWITCH__)
 #ifdef USE_LOCAL_HEADERS
 #	include "SDL.h"
 #	include "SDL_cpuinfo.h"
@@ -46,6 +46,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+
+#ifdef __SWITCH__
+#include "nx_platform.h"
+#endif
 
 static char binaryPath[ MAX_OSPATH ] = { 0 };
 static char installPath[ MAX_OSPATH ] = { 0 };
@@ -112,7 +116,7 @@ Restart the input subsystem
 */
 void Sys_In_Restart_f( void )
 {
-#ifndef DEDICATED
+#if !defined(DEDICATED) && !defined(__SWITCH__)
 	if( !SDL_WasInit( SDL_INIT_VIDEO ) )
 	{
 		Com_Printf( "in_restart: Cannot restart input while video is shutdown\n" );
@@ -142,7 +146,7 @@ Sys_GetClipboardData
 */
 char *Sys_GetClipboardData(void)
 {
-#ifdef DEDICATED
+#if defined(DEDICATED) || defined(__SWITCH__)
 	return NULL;
 #else
 	char *data = NULL;
@@ -284,7 +288,7 @@ static __attribute__ ((noreturn)) void Sys_Exit( int exitCode )
 {
 	CON_Shutdown( );
 
-#ifndef DEDICATED
+#if !defined(DEDICATED) && !defined(__SWITCH__)
 	SDL_Quit( );
 #endif
 
@@ -298,7 +302,11 @@ static __attribute__ ((noreturn)) void Sys_Exit( int exitCode )
 
 	Sys_PlatformExit( );
 
+#ifdef __SWITCH__
+	NX_ExitEngine( exitCode );
+#else
 	exit( exitCode );
+#endif
 }
 
 /*
@@ -320,7 +328,7 @@ cpuFeatures_t Sys_GetProcessorFeatures( void )
 {
 	cpuFeatures_t features = 0;
 
-#ifndef DEDICATED
+#if !defined(DEDICATED) && !defined(__SWITCH__)
 	if( SDL_HasRDTSC( ) )	features |= CF_RDTSC;
 	if( SDL_Has3DNow( ) )	features |= CF_3DNOW;
 	if( SDL_HasMMX( ) )	features |= CF_MMX;
@@ -582,6 +590,9 @@ void *Sys_LoadGameDll(const char *name,
 	vmMainProc *entryPoint,
 	intptr_t (*systemcalls)(intptr_t, ...))
 {
+#ifdef __SWITCH__
+	return NX_LoadModule( name, entryPoint, systemcalls );
+#else
 	void *libHandle;
 	void (*dllEntry)(intptr_t (*syscallptr)(intptr_t, ...));
 
@@ -617,6 +628,7 @@ void *Sys_LoadGameDll(const char *name,
 	dllEntry( systemcalls );
 
 	return libHandle;
+#endif
 }
 
 /*
@@ -686,12 +698,16 @@ void Sys_SigHandler( int signal )
 main
 =================
 */
+#ifdef __SWITCH__
+int Sys_Main( int argc, char **argv )
+#else
 int main( int argc, char **argv )
+#endif
 {
 	int   i;
 	char  commandLine[ MAX_STRING_CHARS ] = { 0 };
 
-#ifndef DEDICATED
+#if !defined(DEDICATED) && !defined(__SWITCH__)
 	// SDL version check
 
 	// Compile time

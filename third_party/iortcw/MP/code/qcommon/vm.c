@@ -621,6 +621,16 @@ vm_t *VM_Create( const char *module, intptr_t (*systemCalls)(intptr_t *),
 
 	Q_strncpyz(vm->name, module, sizeof(vm->name));
 
+#ifdef __SWITCH__
+	// the modules are part of the executable: there is nothing to look for
+	vm->dllHandle = Sys_LoadGameDll( module, &vm->entryPoint, VM_DllSyscall );
+	if ( !vm->dllHandle ) {
+		Com_Error( ERR_FATAL, "VM_Create: no module named %s", module );
+	}
+	vm->systemCall = systemCalls;
+	return vm;
+#endif
+
 #ifdef DEDICATED
 	pureServer = qfalse;
 #else

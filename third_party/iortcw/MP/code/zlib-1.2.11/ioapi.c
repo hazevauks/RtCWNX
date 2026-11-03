@@ -14,7 +14,7 @@
         #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#if defined(__APPLE__) || defined(IOAPI_NO_64)
+#if defined(__APPLE__) || defined(IOAPI_NO_64) || defined(__SWITCH__)
 // In darwin and perhaps other BSD variants off_t is a 64 bit value, hence no need for specific 64 bit functions
 #define FOPEN_FUNC(filename, mode) fopen(filename, mode)
 #define FTELLO_FUNC(stream) ftello(stream)
@@ -234,8 +234,16 @@ void fill_fopen_filefunc (pzlib_filefunc_def)
     pzlib_filefunc_def->opaque = NULL;
 }
 
+#ifdef __SWITCH__
+void NX_FillZipFileFuncs (zlib_filefunc64_def *def);
+#endif
+
 void fill_fopen64_filefunc (zlib_filefunc64_def*  pzlib_filefunc_def)
 {
+#ifdef __SWITCH__
+    NX_FillZipFileFuncs(pzlib_filefunc_def);
+    return;
+#endif
     pzlib_filefunc_def->zopen64_file = fopen64_file_func;
     pzlib_filefunc_def->zread_file = fread_file_func;
     pzlib_filefunc_def->zwrite_file = fwrite_file_func;
