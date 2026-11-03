@@ -26,7 +26,8 @@ Use a copy of the game's folder: the game writes its settings and saves there.
 | --- | --- |
 | `sp_smoke.txt` | The title, a new game, walking, leaning, the notebook, a save and a load |
 | `sp_wheel.txt` | The weapon wheel, and the buttons around it |
-| `sp_all_maps.txt` | Every map of the campaign, with what each asks of the console in the log |
+| `sp_all_maps.txt` | The campaign's maps, with what each asks of the console in the log |
+| `sp_cutscenes.txt` | The cutscene maps that one leaves out |
 | `sp_textures.txt` | The heaviest maps' texture memory, at the quality it is started with |
 | `mp_smoke.txt` | The multiplayer game (`build.py MP`): its menus, a local server on two maps, limbo and a spawn |
 

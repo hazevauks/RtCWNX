@@ -102,7 +102,7 @@ command line arguments, like `+set r_dkPerf 1`.
 | Area | State |
 | --- | --- |
 | Builds: both games, native renderer, shaders | Works, here and on GitHub Actions |
-| Game files, file system, all 27 campaign maps | Works on a PC, with a software stand-in for the GPU |
+| Game files, file system, all 32 campaign maps | Works on a PC, with a software stand-in for the GPU |
 | Menus, HUD, videos, fog, lean, weapon wheel, save and load | Works on a PC, the same way |
 | Multiplayer, local server | Works on a PC, the same way |
 | Boots on a console | **Not tested yet** |

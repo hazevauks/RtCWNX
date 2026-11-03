@@ -21,12 +21,13 @@ and a software rasterizer in place of deko3D. With it:
 
 - All 19 pk3 files mount: 6384 files in the single player game. No two names differ only by case.
 - The title screen, the id Software video and the menus draw right, with text, blending and fades.
-- All 27 maps of the campaign that were tried load, start and shut down with no error: fog, skies, stained glass,
-  letterboxed cutscenes, characters, weapons and the HUD all look right.
+- All 32 maps of the campaign load, start and shut down with no error: fog, skies, stained glass, letterboxed
+  cutscenes, characters, weapons and the HUD all look right.
 - The controller's scripted presses walk, turn, lean, fire, crouch, jump, reload, zoom, and open the menu, the notebook
   and the console.
 - The weapon wheel opens, follows the stick and picks, and a tap steps to the next weapon.
 - Saving and loading work.
+- The mixer's output has sound in both channels, at sane levels, for the whole of a 60 second run.
 - The multiplayer game goes through its menus to a local server on two maps, past the pure check, into limbo
   and a spawn, with its HUD.
 - Each module starts fresh on every load, through several map changes.
@@ -47,6 +48,14 @@ Counted by the host check at 1280x720, in one frame of each map, on a spot just 
 | Images | 609 | 797 |
 | Texture memory, at full size | | 103 MB (`dam`) |
 | Hunk in use | 39 MB (`boss1`) | 64 MB (`swf`) |
+
+## Misaligned memory
+
+A build that traps on any misaligned access stops as soon as the game loads a map's bot data (`AAS_ParseBSPEntities`): botlib's
+allocator hands out memory that is not aligned for 8 byte fields. That is fine on the console's normal memory, whose
+CPU allows it, and it is upstream's code as it runs on other arm64 systems. A trap build cannot look past its first hit, so this says
+nothing of the code after it. On the console, a misaligned access to memory the GPU sees is the case to watch for, and the renderer's copies
+into it are plain ones. `rtcw_crash.txt` would show it as a data abort.
 
 These are small numbers for this GPU. If the target is missed, the CPU is the first place to look: the game's logic, AI and
 the renderer's work on surfaces all share one 1 GHz core.
