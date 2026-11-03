@@ -29,7 +29,14 @@ jobs:
         run: python3 tools/check_repo.py
 
       - name: Libraries
-        run: dkp-pacman -Sy --noconfirm --needed switch-dev switch-cmake deko3d uam switch-mesa switch-libjpeg-turbo switch-zlib
+        # The image has what the build needs. The package server sometimes turns CI machines
+        # away, and a build that goes on with the image's packages is better than none.
+        run: |
+          for attempt in 1 2 3; do
+            dkp-pacman -Sy --noconfirm --needed switch-dev switch-cmake deko3d uam switch-mesa switch-libjpeg-turbo switch-zlib && exit 0
+            sleep 30
+          done
+          echo "::warning::the package server did not answer: building with the image's packages"
 
       - name: Build
         run: ./build.sh
@@ -88,7 +95,12 @@ jobs:
           apt-get install -y -qq cmake ninja-build python3
 
       - name: Libraries
-        run: dkp-pacman -Sy --noconfirm --needed switch-dev switch-cmake switch-mesa switch-libdrm_nouveau switch-libjpeg-turbo switch-zlib
+        run: |
+          for attempt in 1 2 3; do
+            dkp-pacman -Sy --noconfirm --needed switch-dev switch-cmake switch-mesa switch-libdrm_nouveau switch-libjpeg-turbo switch-zlib && exit 0
+            sleep 30
+          done
+          echo "::warning::the package server did not answer: building with the image's packages"
 
       - name: Build
         run: ./build.sh -DRTCW_RENDERER_BACKEND=opengl

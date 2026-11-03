@@ -1,0 +1,27 @@
+# The campaign's cutscene maps, which sp_all_maps.txt leaves out but for the first.
+100 cmd spmap cutscene6
++500 press A
++2 release A
++200 shot cut_cutscene6
++2 stats cutscene6
++4 cmd spmap cutscene9
++500 press A
++2 release A
++200 shot cut_cutscene9
++2 stats cutscene9
++4 cmd spmap cutscene11
++500 press A
++2 release A
++200 shot cut_cutscene11
++2 stats cutscene11
++4 cmd spmap cutscene14
++500 press A
++2 release A
++200 shot cut_cutscene14
++2 stats cutscene14
++4 cmd spmap cutscene19
++500 press A
++2 release A
++200 shot cut_cutscene19
++2 stats cutscene19
++2 quit
