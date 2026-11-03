@@ -57,7 +57,7 @@ coordinates, lighting, sorting) and asks OpenGL to draw arrays with some state s
 | `source/renderer/dkgl.c` | the part of OpenGL the renderer uses: state, matrices, arrays, immediate mode, texture objects |
 | `source/renderer/dk_device.c` | deko3D: device, memory, swapchain, state objects, uploads, frame pacing |
 | `source/renderer/glimp_dk.c` | what the renderer asks of its system |
-| `tools/hostcheck/host_device.c` | the same interface as `dk_device.c`, with a software rasterizer |
+| `tools/hostcheck/fake_deko3d.c` | on a PC, deko3D for `dk_device.c` to run on, over a software rasterizer |
 
 There is no OpenGL driver and no Mesa in the build, and each renderer stays the code it is on PC, with its fixes.
 

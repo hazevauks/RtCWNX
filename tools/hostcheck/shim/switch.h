@@ -53,6 +53,9 @@ Result romfsMountFromFsdev (const char *path, u64 offset, const char *name);
 bool appletMainLoop (void);
 int appletGetAppletType (void);
 
+/* the screen */
+void *nwindowGetDefault (void);
+
 /* locks */
 typedef pthread_mutex_t Mutex;
 #define mutexInit(m)	pthread_mutex_init(m, NULL)

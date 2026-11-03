@@ -20,6 +20,11 @@ nxlink -s -a <console address> build/RtCWNX.nro
 
 That prints the log in the terminal as it runs. Started this way, starting the other game looks for it on the card.
 
+## A picture of what the console shows
+
+Open the console (+ and − together), press A for the keyboard and enter `screenshotJPEG`. The picture goes to
+`sd:/switch/RtCWNX/main/screenshots/`.
+
 ## If the native renderer does not start
 
 The `RtCWNX_fallback_opengl` artifact of each GitHub Actions run is the same game on OpenGL through Mesa. Locally:

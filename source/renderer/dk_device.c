@@ -59,6 +59,10 @@
 #define SAMPLER_GAMMA		(MAX_SAMPLERS + 1)
 #define NUM_SAMPLER_DESCRIPTORS	(MAX_SAMPLERS + 2)
 
+#ifndef NX_ROMFS_SHADERS	/* tools/hostcheck points this at a build's output */
+#define NX_ROMFS_SHADERS	"romfs:/shaders/"
+#endif
+
 #define ALIGN_UP(value, align)	(((value) + (align) - 1) & ~((align) - 1))
 
 enum
@@ -185,8 +189,6 @@ static cvar_t	*r_dkPerf;
 static unsigned	stat_draws, stat_frames;
 static uint32_t	stat_stream_peak;
 static int	stat_last_ms;
-
-extern void Sys_Error (const char *error, ...);
 
 /*
 ===============================================================================
@@ -846,10 +848,12 @@ static void BeginFrame (void)
 /* The engine measures y from the bottom of the screen. */
 static void Flush (void)
 {
-	const unsigned	d = dirty;
+	unsigned	d;
 
+	/* opening a frame marks everything as to be set: the screen's pass changed it all */
 	BeginFrame();
-	if (!dirty)
+	d = dirty;
+	if (!d)
 		return;
 	dirty = 0;
 
@@ -1054,8 +1058,8 @@ static void DrawToScreen (int slot)
 	plain_depth.depthTestEnable = false;
 	plain_depth.depthWriteEnable = false;
 
-	dkCmdBufDiscardDepthStencil(cmd);
 	dkCmdBufBarrier(cmd, DkBarrier_Fragments, DkInvalidateFlags_Image);
+	dkCmdBufDiscardDepthStencil(cmd);
 	dkCmdBufBindRenderTargets(cmd, &color, 1, NULL);
 	dkCmdBufSetViewports(cmd, 0, &viewport, 1);
 	dkCmdBufSetScissors(cmd, 0, &scissor, 1);
@@ -1273,7 +1277,7 @@ static qboolean LoadShaderFile (const char *name, DkShader *shader, uint32_t *co
 	DkShaderMaker	maker;
 	qboolean	ok;
 
-	snprintf(path, sizeof(path), "romfs:/shaders/%s.dksh", name);
+	snprintf(path, sizeof(path), NX_ROMFS_SHADERS "%s.dksh", name);
 	f = fopen(path, "rb");
 	if (!f)
 		return qfalse;

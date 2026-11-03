@@ -1,12 +1,9 @@
-/* host_device.c -- dk_device.h with a software rasterizer, for a PC.
+/* soft_gpu.c -- a software rasterizer, for tools/hostcheck/fake_deko3d.c to draw with.
  *
- * It draws what source/renderer/dkgl.c asks for with the same rules as
- * shaders/rtcw.vert and shaders/rtcw.frag, into memory. It only rasterizes the frames
- * a scenario wants a picture of, so that the others run at full speed, and it
- * counts what every frame asks for, which is what the console's budgets are about.
- *
- * It is here to show that what the renderer asks makes the right picture. What it
- * cannot show is that deko3D does what dk_device.c tells it: that takes a console.
+ * It draws with the same rules as shaders/rtcw.vert and shaders/rtcw.frag, into memory.
+ * It only rasterizes the frames a scenario wants a picture of, so that the others run at
+ * full speed, and it counts what every frame asks for, which is what the console's
+ * budgets are about.
  */
 
 #include <math.h>
@@ -16,27 +13,16 @@
 
 #include <zlib.h>
 
-#include "renderer/tr_local.h"
+#include "qcommon/q_shared.h"
 
 #include "dk_device.h"
 #include "nx_platform.h"
-#include "shim/host_device.h"
+#include "soft_gpu.h"
+#include "shim/host_scenario.h"
 
 #define SCREEN_W		1280
 #define SCREEN_H		720
-#define STREAM_SIZE		(128 * 1024 * 1024)
-#define MAX_LEVELS		14
 #define MAX_CLIPPED		16
-
-typedef struct
-{
-	qboolean	used;
-	qboolean	has_alpha;
-	int		levels;
-	int		w[MAX_LEVELS], h[MAX_LEVELS];
-	byte		*pixels[MAX_LEVELS];
-	size_t		bytes;
-} hostTexture_t;
 
 typedef struct
 {
@@ -50,12 +36,6 @@ typedef struct
 static byte	*color_buffer;
 static float	*depth_buffer;
 static byte	*stencil_buffer;
-static byte	*stream;
-static uint32_t	stream_head;
-
-static hostTexture_t	host_textures[DEV_MAX_TEXTURES];
-static size_t		texture_bytes;
-static int		num_host_textures;
 
 static devRenderState_t		rs;
 static devProgram_t		prog;
@@ -63,10 +43,9 @@ static qboolean			prog_clip;
 static devVertexUniforms_t	vu;
 static float			fog_color[4];
 static devVertices_t		verts;
-static int			bound_texture[DEV_MAX_TEXTURE_UNITS];
+static softTexture_t		bound_texture[DEV_MAX_TEXTURE_UNITS];
+static qboolean			bound_valid[DEV_MAX_TEXTURE_UNITS];
 static devSampler_t		bound_sampler[DEV_MAX_TEXTURE_UNITS];
-
-static byte	gamma_table[3][256];
 
 static char	shot_name[64];
 static char	stats_name[64];
@@ -74,8 +53,6 @@ static qboolean	rasterize;
 
 /* what a frame asked for */
 static unsigned	c_draws, c_vertices, c_indices, c_clears, c_state_changes, c_texture_binds;
-static size_t	c_stream_peak;
-static unsigned	c_frames;
 static float	c_fragments;
 
 void Host_RequestShot (const char *name)
@@ -89,141 +66,49 @@ void Host_RequestStats (const char *name)
 	snprintf(stats_name, sizeof(stats_name), "%s", name);
 }
 
-qboolean DEV_Init (int *width, int *height)
+static void Init (void)
 {
-	if (!color_buffer)
-	{
-		color_buffer = malloc(SCREEN_W * SCREEN_H * 4);
-		depth_buffer = malloc(SCREEN_W * SCREEN_H * sizeof(float));
-		stencil_buffer = malloc(SCREEN_W * SCREEN_H);
-		stream = malloc(STREAM_SIZE);
-	}
-	memset(host_textures, 0, sizeof(host_textures));
-	texture_bytes = 0;
-	num_host_textures = 0;
-	*width = SCREEN_W;
-	*height = SCREEN_H;
-	return qtrue;
+	if (color_buffer)
+		return;
+	color_buffer = calloc(SCREEN_W * SCREEN_H, 4);
+	depth_buffer = malloc(SCREEN_W * SCREEN_H * sizeof(float));
+	stencil_buffer = calloc(SCREEN_W, SCREEN_H);
 }
 
-void DEV_Shutdown (void)
+void SOFT_BindTexture (int unit, const softTexture_t *texture, const devSampler_t *sampler)
 {
-	int	i;
-
-	for (i = 0; i < DEV_MAX_TEXTURES; i++)
-	{
-		if (host_textures[i].used)
-			DEV_TextureDestroy(i);
-	}
-}
-
-void *DEV_Stream (uint32_t size, devAddr_t *addr)
-{
-	byte	*p;
-
-	stream_head = (stream_head + 15) & ~15u;
-	if (stream_head + size > STREAM_SIZE)
-	{
-		fprintf(stderr, "host: a frame's vertices outgrew %d MB\n", STREAM_SIZE >> 20);
-		stream_head = 0;
-	}
-	p = stream + stream_head;
-	stream_head += size;
-	*addr = (devAddr_t) p;
-	return p;
-}
-
-/*
-===============================================================================
-
-TEXTURES
-
-===============================================================================
-*/
-
-int DEV_TextureCreate (int width, int height, int levels, qboolean has_alpha)
-{
-	int	id, i;
-
-	for (id = 0; id < DEV_MAX_TEXTURES; id++)
-	{
-		hostTexture_t	*t = &host_textures[id];
-
-		if (t->used)
-			continue;
-		t->used = qtrue;
-		t->has_alpha = has_alpha;
-		t->levels = levels;
-		t->bytes = 0;
-		for (i = 0; i < levels; i++)
-		{
-			t->w[i] = width > 1 ? width : 1;
-			t->h[i] = height > 1 ? height : 1;
-			t->pixels[i] = malloc((size_t) t->w[i] * t->h[i] * 4);
-			t->bytes += (size_t) t->w[i] * t->h[i] * 4;
-			width >>= 1;
-			height >>= 1;
-		}
-		texture_bytes += t->bytes;
-		num_host_textures++;
-		return id;
-	}
-	ri.Error(ERR_FATAL, "host: out of textures");
-	return -1;
-}
-
-void DEV_TextureUpload (int id, int level, int x, int y, int width, int height, const void *rgba)
-{
-	hostTexture_t	*t = &host_textures[id];
-	const byte	*in = rgba;
-	int		row;
-
-	for (row = 0; row < height; row++)
-		memcpy(t->pixels[level] + ((size_t) (y + row) * t->w[level] + x) * 4, in + (size_t) row * width * 4, width * 4);
-}
-
-void DEV_TextureDestroy (int id)
-{
-	hostTexture_t	*t = &host_textures[id];
-	int		i;
-
-	for (i = 0; i < t->levels; i++)
-		free(t->pixels[i]);
-	texture_bytes -= t->bytes;
-	num_host_textures--;
-	memset(t, 0, sizeof(*t));
-}
-
-void DEV_SetTexture (int unit, int id, const devSampler_t *sampler)
-{
-	bound_texture[unit] = id;
-	bound_sampler[unit] = *sampler;
 	c_texture_binds++;
+	bound_valid[unit] = texture != NULL;
+	if (texture)
+	{
+		bound_texture[unit] = *texture;
+		bound_sampler[unit] = *sampler;
+	}
 }
 
-void DEV_SetRenderState (const devRenderState_t *state)
+void SOFT_SetRenderState (const devRenderState_t *state)
 {
 	rs = *state;
 	c_state_changes++;
 }
 
-void DEV_SetProgram (devProgram_t program, qboolean clip)
+void SOFT_SetProgram (devProgram_t program, qboolean clip)
 {
 	prog = program;
 	prog_clip = clip;
 }
 
-void DEV_SetVertexUniforms (const devVertexUniforms_t *uniforms)
+void SOFT_SetVertexUniforms (const devVertexUniforms_t *uniforms)
 {
 	vu = *uniforms;
 }
 
-void DEV_SetFogColor (const float *rgba)
+void SOFT_SetFogColor (const float *rgba)
 {
 	memcpy(fog_color, rgba, sizeof(fog_color));
 }
 
-void DEV_SetVertices (const devVertices_t *vertices)
+void SOFT_SetVertices (const devVertices_t *vertices)
 {
 	verts = *vertices;
 }
@@ -328,7 +213,7 @@ static int ClipPlane (const vert_t *in, int count, vert_t *out, float a, float b
 	return produced;
 }
 
-static void SampleLevel (const hostTexture_t *t, int level, const devSampler_t *smp, float s, float u, float *out)
+static void SampleLevel (const softTexture_t *t, int level, const devSampler_t *smp, float s, float u, float *out)
 {
 	const int	w = t->w[level], h = t->h[level];
 	const byte	*pixels = t->pixels[level];
@@ -457,7 +342,7 @@ static void StencilApply (byte *value, GLenum op)
 
 /* Which mip a triangle's texture comes from: one for the triangle, by how many texels
  * it covers. It is a test picture: per pixel mips would add nothing to what it shows. */
-static int ChooseLevel (const hostTexture_t *t, const devSampler_t *smp, const float *st_a, const float *st_b, const float *st_c, float screen_area)
+static int ChooseLevel (const softTexture_t *t, const devSampler_t *smp, const float *st_a, const float *st_b, const float *st_c, float screen_area)
 {
 	float	texel_area, ratio;
 	int	level;
@@ -483,7 +368,7 @@ static void RasterTriangle (const vert_t *a, const vert_t *b, const vert_t *c)
 	float		wx[3], wy[3], wz[3];
 	float		area, inv_area;
 	int		min_x, max_x, min_y, max_y;
-	const hostTexture_t *tex0 = NULL, *tex1 = NULL;
+	const softTexture_t *tex0 = NULL, *tex1 = NULL;
 	int		level0 = 0, level1 = 0;
 	float		z_bias = 0;
 	int		i, x, y;
@@ -529,12 +414,16 @@ static void RasterTriangle (const vert_t *a, const vert_t *b, const vert_t *c)
 
 	if (prog != DEV_FS_COLOR)
 	{
-		tex0 = &host_textures[bound_texture[0]];
+		if (!bound_valid[0])
+			return;
+		tex0 = &bound_texture[0];
 		level0 = ChooseLevel(tex0, &bound_sampler[0], a->st0, b->st0, c->st0, fabsf(area));
 	}
 	if (prog == DEV_FS_MULTI_MODULATE || prog == DEV_FS_MULTI_ADD || prog == DEV_FS_MULTI_DECAL)
 	{
-		tex1 = &host_textures[bound_texture[1]];
+		if (!bound_valid[1])
+			return;
+		tex1 = &bound_texture[1];
 		level1 = ChooseLevel(tex1, &bound_sampler[1], a->st1, b->st1, c->st1, fabsf(area));
 	}
 
@@ -747,92 +636,125 @@ static void DrawPrimitive (GLenum mode, const unsigned *indices, int first, int 
 #undef INDEX
 }
 
-void DEV_Draw (GLenum mode, int first, int count)
+void SOFT_Draw (GLenum mode, int first, int count)
 {
+	Init();
 	c_draws++;
 	c_vertices += count;
 	if (rasterize && !rs.polygon_line)
 		DrawPrimitive(mode, NULL, first, count);
 }
 
-void DEV_DrawIndexed (GLenum mode, devAddr_t indices, int count)
+void SOFT_DrawIndexed (GLenum mode, devAddr_t indices, int count)
 {
+	Init();
 	c_draws++;
 	c_indices += count;
 	if (rasterize && !rs.polygon_line)
 		DrawPrimitive(mode, (const unsigned *) indices, 0, count);
 }
 
-void DEV_Clear (GLbitfield mask, const float *color, float depth, int stencil)
+static void ScissorBounds (int *x0, int *y0, int *x1, int *y1)
 {
-	int	x, y;
-	int	x0 = 0, y0 = 0, x1 = SCREEN_W, y1 = SCREEN_H;
+	*x0 = 0;
+	*y0 = 0;
+	*x1 = SCREEN_W;
+	*y1 = SCREEN_H;
+	if (rs.scissor_test)
+	{
+		*x0 = rs.scissor[0] < 0 ? 0 : rs.scissor[0];
+		*y0 = rs.scissor[1] < 0 ? 0 : rs.scissor[1];
+		*x1 = rs.scissor[0] + rs.scissor[2];
+		*y1 = rs.scissor[1] + rs.scissor[3];
+		if (*x1 > SCREEN_W) *x1 = SCREEN_W;
+		if (*y1 > SCREEN_H) *y1 = SCREEN_H;
+	}
+}
 
+void SOFT_ClearColor (unsigned mask, const float *color)
+{
+	int	x0, y0, x1, y1, x, y, k;
+
+	Init();
 	c_clears++;
 	if (!rasterize)
 		return;
-
-	if (rs.scissor_test)
+	ScissorBounds(&x0, &y0, &x1, &y1);
+	for (y = y0; y < y1; y++)
 	{
-		x0 = rs.scissor[0] < 0 ? 0 : rs.scissor[0];
-		y0 = rs.scissor[1] < 0 ? 0 : rs.scissor[1];
-		x1 = rs.scissor[0] + rs.scissor[2];
-		y1 = rs.scissor[1] + rs.scissor[3];
-		if (x1 > SCREEN_W) x1 = SCREEN_W;
-		if (y1 > SCREEN_H) y1 = SCREEN_H;
+		byte	*row = color_buffer + (size_t) (SCREEN_H - 1 - y) * SCREEN_W * 4;
+
+		for (x = x0; x < x1; x++)
+			for (k = 0; k < 4; k++)
+				if (mask & (1u << k))
+					row[x * 4 + k] = (byte) (color[k] * 255.0f);
 	}
+}
+
+void SOFT_ClearDepthStencil (int clear_depth, float depth, unsigned stencil_mask, int stencil)
+{
+	int	x0, y0, x1, y1, x, y;
+
+	Init();
+	c_clears++;
+	if (!rasterize)
+		return;
+	ScissorBounds(&x0, &y0, &x1, &y1);
 	for (y = y0; y < y1; y++)
 	{
 		const size_t	row = (size_t) (SCREEN_H - 1 - y) * SCREEN_W;
 
 		for (x = x0; x < x1; x++)
 		{
-			const size_t	offset = row + x;
-
-			if (mask & GL_COLOR_BUFFER_BIT)
-			{
-				int	k;
-
-				for (k = 0; k < 4; k++)
-				{
-					if (rs.color_mask & (1u << k))
-						color_buffer[offset * 4 + k] = (byte) (color[k] * 255.0f);
-				}
-			}
-			if (mask & GL_DEPTH_BUFFER_BIT)
-				depth_buffer[offset] = depth;
-			if (mask & GL_STENCIL_BUFFER_BIT)
-				stencil_buffer[offset] = (byte) stencil;
+			if (clear_depth)
+				depth_buffer[row + x] = depth;
+			if (stencil_mask)
+				stencil_buffer[row + x] = (byte) stencil;
 		}
 	}
 }
 
-/* The console only learns this frames later. Saying yes here shows every flare, while
- * the point that the console draws for it still goes through the state this checks. */
-qboolean DEV_DepthProbe (int id)
+/* Frames that are not drawn have no depth to test against. */
+qboolean SOFT_PointPasses (void)
 {
-	(void) id;
-	c_draws++;
-	return qtrue;
+	vert_t	v;
+	float	wx, wy, wz;
+	int	x, y;
+
+	Init();
+	if (!rasterize)
+		return qtrue;
+	TransformVertex(0, &v);
+	wx = rs.viewport[0] + (v.clip[0] / v.clip[3] + 1) * 0.5f * rs.viewport[2];
+	wy = rs.viewport[1] + (v.clip[1] / v.clip[3] + 1) * 0.5f * rs.viewport[3];
+	wz = rs.depth_near + (v.clip[2] / v.clip[3] + 1) * 0.5f * (rs.depth_far - rs.depth_near);
+	x = (int) wx;
+	y = (int) wy;
+	if (x < 0 || y < 0 || x >= SCREEN_W || y >= SCREEN_H)
+		return qfalse;
+	return Compare(rs.depth_func, wz, depth_buffer[(size_t) (SCREEN_H - 1 - y) * SCREEN_W + x]);
 }
 
-void DEV_SetGammaTable (const unsigned char *red, const unsigned char *green, const unsigned char *blue)
+void SOFT_ReadRow (unsigned row, unsigned x, unsigned width, byte *rgba)
 {
-	memcpy(gamma_table[0], red, 256);
-	memcpy(gamma_table[1], green, 256);
-	memcpy(gamma_table[2], blue, 256);
+	Init();
+	memcpy(rgba, color_buffer + ((size_t) row * SCREEN_W + x) * 4, width * 4);
 }
 
-void DEV_ReadScreen (int x, int y, int width, int height, void *rgba)
+void SOFT_ApplyGamma (const byte *table)
 {
-	byte	*out = rgba;
-	int	row;
+	size_t	i;
 
-	for (row = 0; row < height; row++)
+	Init();
+	if (!rasterize)
+		return;
+	for (i = 0; i < (size_t) SCREEN_W * SCREEN_H; i++)
 	{
-		const size_t	offset = (size_t) (SCREEN_H - 1 - (y + row)) * SCREEN_W + x;
+		byte	*p = color_buffer + i * 4;
 
-		memcpy(out + (size_t) row * width * 4, color_buffer + offset * 4, width * 4);
+		p[0] = table[p[0] * 4 + 0];
+		p[1] = table[p[1] * 4 + 1];
+		p[2] = table[p[2] * 4 + 2];
 	}
 }
 
@@ -914,9 +836,9 @@ static void WriteShot (const char *name)
 		*out++ = 0;
 		for (x = 0; x < SCREEN_W; x++)
 		{
-			*out++ = gamma_table[0][in[0]];
-			*out++ = gamma_table[1][in[1]];
-			*out++ = gamma_table[2][in[2]];
+			*out++ = in[0];
+			*out++ = in[1];
+			*out++ = in[2];
 			in += 4;
 		}
 	}
@@ -936,17 +858,13 @@ static void WriteShot (const char *name)
 	free(packed);
 }
 
-void DEV_Present (void)
+void SOFT_Present (void)
 {
-	if (stream_head > c_stream_peak)
-		c_stream_peak = stream_head;
-	c_frames++;
-
+	Init();
 	if (stats_name[0])
 	{
-		NX_LogPrintf("stats %s: %u draws, %u indices, %u vertices, %u state changes, %u binds, %u KB of vertices, %d images in %u MB\n",
-				stats_name, c_draws, c_indices, c_vertices, c_state_changes, c_texture_binds,
-				stream_head / 1024, num_host_textures, (unsigned) (texture_bytes >> 20));
+		NX_LogPrintf("stats %s: %u draws, %u indices, %u vertices, %u state changes, %u binds, %d fake deko3D errors\n",
+				stats_name, c_draws, c_indices, c_vertices, c_state_changes, c_texture_binds, FakeDeko3D_Errors());
 		stats_name[0] = 0;
 	}
 
@@ -961,5 +879,4 @@ void DEV_Present (void)
 
 	c_draws = c_vertices = c_indices = c_clears = c_state_changes = c_texture_binds = 0;
 	c_fragments = 0;
-	stream_head = 0;
 }

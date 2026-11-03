@@ -21,8 +21,8 @@ with a native [deko3D](https://github.com/devkitPro/deko3d) renderer.
 ---
 
 > [!WARNING]
-> Work in progress: this has not run on a console yet. The whole game has run on a PC, on
-> real game files, with a stand-in for the console. See [Status](#status).
+> Work in progress: both games start on a console, and their picture is being fixed. The whole
+> game has run on a PC, on real game files, with a stand-in for the console. See [Status](#status).
 
 This repository has no game files. You need your own copy of the game.
 
@@ -102,11 +102,12 @@ command line arguments, like `+set r_dkPerf 1`.
 | Area | State |
 | --- | --- |
 | Builds: both games, native renderer, shaders | Works, here and on GitHub Actions |
-| Game files, file system, all 32 campaign maps | Works on a PC, with a software stand-in for the GPU |
+| Game files, file system, all 32 campaign maps | Works on a PC, with a stand-in for the GPU |
 | Menus, HUD, videos, fog, lean, weapon wheel, save and load | Works on a PC, the same way |
 | Multiplayer, local server | Works on a PC, the same way |
-| Boots on a console | **Not tested yet** |
-| The picture through deko3D, sound, Joy-Cons | **Not tested yet** |
+| Boots on a console: both games | Works, with no errors in the logs |
+| The picture through deko3D | **Distorted in the first test: fix waiting for a second test** |
+| Sound, Joy-Cons | **Not confirmed yet** |
 | Online play against PC servers | **Not tested yet** |
 | 60 fps at 1020/460/1331 MHz | **Not measured yet** |
 

@@ -24,7 +24,7 @@
 
 #include <switch.h>
 
-#include "host_device.h"
+#include "host_scenario.h"
 
 #define NS_PER_FRAME		16666667ULL
 #define NS_PER_CLOCK_READ	1000ULL
@@ -252,6 +252,11 @@ bool appletMainLoop (void)
 	virtual_ns += NS_PER_FRAME;
 	frame_number++;
 	return !quit_requested;
+}
+
+void *nwindowGetDefault (void)
+{
+	return NULL;
 }
 
 /* ---- threads ---- */

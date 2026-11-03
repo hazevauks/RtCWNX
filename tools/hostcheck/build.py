@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Builds a game for the PC it runs on, with tools/hostcheck/shim/ standing in for libnx.
 
-    python tools/hostcheck/build.py SP --game-dir <folder> --iortcw <iortcw clone> --gl-include <folder with GL/>
+    python tools/hostcheck/build.py SP --game-dir <folder> --iortcw <iortcw clone> --gl-include <folder with GL/> \
+        --deko3d-include <folder with deko3d.h>
 
-The game folder is laid out as on the SD card: main/*.pk3. It is compiled in as the base
+A build for the console comes first, for its compiled shaders. The game folder is laid out
+as on the SD card: main/*.pk3. It is compiled in as the base
 directory, like the console's path, and written to (settings, saves, logs). The iortcw clone
 provides the zlib and libjpeg the console gets from devkitPro. Needs a GCC whose `long` has 64 bits,
 as on the console: MSYS2's own "gcc" package, or any Linux. See README.md.
@@ -85,6 +87,9 @@ def main():
     parser.add_argument("--game-dir", required=True)
     parser.add_argument("--iortcw", required=True, type=pathlib.Path)
     parser.add_argument("--gl-include", required=True, type=pathlib.Path)
+    parser.add_argument("--deko3d-include", required=True, type=pathlib.Path, help="the folder of libnx's deko3d.h")
+    parser.add_argument("--shaders", default=ROOT / "build" / "romfs" / "shaders", type=pathlib.Path,
+                        help="the .dksh files of a build for the console")
     parser.add_argument("--gcc", default="gcc")
     parser.add_argument("--flags", default="", help="extra compiler flags, for example -fsanitize=alignment")
     parser.add_argument("--jobs", type=int, default=os.cpu_count())
@@ -106,12 +111,17 @@ def main():
         if (args.gl_include / folder).exists() and not (include / folder).exists():
             shutil.copytree(args.gl_include / folder, include / folder)
 
+    if not (include / "deko3d.h").exists():
+        include.mkdir(parents=True, exist_ok=True)
+        shutil.copy(args.deko3d_include / "deko3d.h", include / "deko3d.h")
+
     upstream = args.iortcw / game / "code"
     extra = args.flags.split()
     # in a header: quotes do not survive a command line between Windows and MSYS2
     out.mkdir(parents=True, exist_ok=True)
     config = out / "host_config.h"
-    config_text = '#define PRODUCT_VERSION "1.51d-%s"\n#define NX_GAME_DIR "%s"\n#define DEFAULT_BASEDIR "%s"\n' % (game, args.game_dir, args.game_dir)
+    config_text = '#define PRODUCT_VERSION "1.51d-%s"\n#define NX_GAME_DIR "%s"\n#define DEFAULT_BASEDIR "%s"\n#define NX_ROMFS_SHADERS "%s/"\n' % (
+        game, args.game_dir, args.game_dir, posix(args.shaders))
     if not config.exists() or config.read_text() != config_text:
         config.write_text(config_text)
     defines = ["-D__SWITCH__", "-DNX_HOSTCHECK", "-DRTCW_DEKO3D", "-DNO_VM_COMPILED", "-include", posix(config)]
@@ -148,8 +158,9 @@ def main():
         engine_objects.append(obj)
     for source in ("source/platform/nx_main.c", "source/platform/nx_log.c", "source/platform/nx_modules.c",
                    "source/platform/nx_zipio.c", "source/platform/sys_nx.c", "source/platform/in_nx.c",
-                   "source/platform/snd_nx.c", "source/renderer/dkgl.c", "source/renderer/glimp_dk.c",
-                   "tools/hostcheck/host_device.c", "tools/hostcheck/shim/switch_shim.c"):
+                   "source/platform/snd_nx.c", "source/renderer/dkgl.c", "source/renderer/dk_device.c",
+                   "source/renderer/glimp_dk.c", "tools/hostcheck/fake_deko3d.c", "tools/hostcheck/soft_gpu.c",
+                   "tools/hostcheck/shim/switch_shim.c"):
         command = list(cc)
         if source.endswith("nx_main.c"):
             command.append("-Dmain=NX_Main")

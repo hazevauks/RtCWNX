@@ -1,6 +1,6 @@
 # Status
 
-What has been checked, and how. Nothing here counts as working until a console has shown it.
+What has been checked, and how. Only what a console has shown counts as working.
 
 ## Stages
 
@@ -10,14 +10,27 @@ What has been checked, and how. Nothing here counts as working until a console h
 | Build with devkitA64, CMake and libnx | Done | Local build and GitHub Actions |
 | POSIX layer, memory, threads | Built and run | Host check; libnx's own services not yet |
 | Audio and controller mapping | Built and run | Host check; the hardware not yet |
-| Boot on the console, logs | **Waiting for a console** | |
-| Native deko3D renderer | Built; its logic run | Host check up to the GPU; `dk_device.c` not yet run |
+| Boot on the console, logs | Done | Both NROs on a console, with no errors in the logs |
+| Native deko3D renderer | Runs; **picture being fixed** | Host check, with `dk_device.c`; a second console test is next |
 | Performance and tuning | **Waiting for a console** | Counts from the host check |
+
+## The first test on a console
+
+Both NROs started from the homebrew menu, on a title's memory: all pk3 files mounted, deko3D and sound started, the multiplayer
+game opened its socket, and the single player game quit cleanly. The logs have no deko3D error, and there was no crash file. The
+picture was distorted.
+
+The cause was in `Flush`, in `dk_device.c`. It read what state to set before opening the frame, and opening the frame is what marks
+all of it. So a frame opened by its first clear kept the state of the last frame's pass to the screen: the game's geometry went
+through the wrong shaders, with the wrong textures, until something changed them.
+
+The host check could not see that, because `dk_device.c` was the part it replaced. It now runs that file on a stand-in for deko3D.
+The stand-in showed the same fault, in the same place, and shows none since the fix. A second test on a console is what confirms it.
 
 ## What was checked on a PC
 
-[tools/hostcheck](../tools/hostcheck/README.md) runs the port's own code on the game's real files, with a stand-in for libnx
-and a software rasterizer in place of deko3D. With it:
+[tools/hostcheck](../tools/hostcheck/README.md) runs the port's own code on the game's real files, with stand-ins for libnx and
+deko3D. With it:
 
 - All 19 pk3 files mount: 5 in the single player game and 15 in the multiplayer one, which share `pak0.pk3`. No two names
   differ only by case.
@@ -63,9 +76,9 @@ into it are plain ones. `rtcw_crash.txt` would show it as a data abort.
 
 ## What only a console can check
 
-- That it starts at all: libnx's services, the swapchain, audout, HID and the exit handling are stand-ins on a PC.
-- `dk_device.c` and the shaders: the host check shows that what the renderer asks makes the right picture, not that deko3D does
-  what it is told. The first test's most likely trouble is here, and the fallback build is there to tell.
+- What libnx's services do past starting: audout, HID and the exit handling are stand-ins on a PC.
+- `dk_device.c` and the shaders on the real GPU: the host check shows that they ask for the right things, in the right order. It does not
+  run the shaders, and it does not show what the GPU makes of image layouts or its caches. The fallback build is there to tell.
 - Speed on the Switch's CPU, and how long a load takes on a card.
 - Sound on the real service, and its timing.
 - The real Joy-Cons, the touch screen, the system keyboard, sleep and wake.
