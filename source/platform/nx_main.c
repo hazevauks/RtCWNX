@@ -29,6 +29,18 @@ static char	*engine_argv[MAX_ARGS];
 static char	args_text[MAX_ARGS_FILE];
 static int	exit_code;
 
+void NX_SetLoadingBoost (int enable)
+{
+	static int	boosted;
+
+	if (boosted != enable)
+	{
+		/* a mode for loading screens: it takes from the GPU what it gives the CPU */
+		appletSetCpuBoostMode(enable ? ApmCpuBoostMode_FastLoad : ApmCpuBoostMode_Normal);
+		boosted = enable;
+	}
+}
+
 void NX_ExitEngine (int code)
 {
 	exit_code = code;
@@ -54,6 +66,20 @@ static void BuildArguments (int argc, char **argv)
 		engine_argv[engine_argc++] = argv[i];
 	if (engine_argc == 0)
 		engine_argv[engine_argc++] = (char *) "RtCWNX";
+
+	/* Started from the album, the process has about 400 MB. The rest of the time it has
+	 * more than the game has any use for. */
+	if (appletGetAppletType() != AppletType_Application && appletGetAppletType() != AppletType_SystemApplication)
+	{
+		static char	*applet_args[] =
+		{
+			"+set", "com_hunkMegs", "80", "+set", "com_zoneMegs", "24",
+			"+set", "com_soundMegs", "8", "+set", "r_picmip", "1"
+		};
+
+		for (i = 0; i < (int) (sizeof(applet_args) / sizeof(applet_args[0])) && engine_argc < MAX_ARGS; i++)
+			engine_argv[engine_argc++] = applet_args[i];
+	}
 
 	f = fopen(NX_ARGS_FILE, "r");
 	if (!f)
@@ -84,9 +110,13 @@ int main (int argc, char **argv)
 	NX_LogInit();
 	NX_LogMemory("start");
 	if (appletGetAppletType() != AppletType_Application && appletGetAppletType() != AppletType_SystemApplication)
-		NX_LogPrintf("WARNING: running in applet mode, with little memory: start through a game's title override\n");
-	romfsInit();
+		NX_LogPrintf("WARNING: running in applet mode, with little memory and lower settings: start through a game's title override\n");
 
+	/* a forwarder may not say where the NRO is */
+	if (R_FAILED(romfsInit()))
+		romfsMountFromFsdev(NX_OWN_NRO, 0, "romfs");
+
+	NX_SetLoadingBoost(1);
 	BuildArguments(argc, argv);
 
 	rc = threadCreate(&engine_thread, EngineThread, NULL, NULL, ENGINE_STACK_SIZE, ENGINE_THREAD_PRIO, ENGINE_THREAD_CORE);
@@ -103,6 +133,7 @@ int main (int argc, char **argv)
 		exit_code = 1;
 	}
 
+	NX_SetLoadingBoost(0);
 	romfsExit();
 	NX_LogShutdown();
 	socketExit();

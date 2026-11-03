@@ -15,6 +15,18 @@ add_custom_command(
 )
 set(RTCW_SHADER_OUTPUTS ${rtcw_vert})
 
+foreach(stage vert frag)
+	set(output ${RTCW_ROMFS_DIR}/shaders/present_${stage}.dksh)
+	add_custom_command(
+		OUTPUT ${output}
+		COMMAND ${NX_UAM_EXE} -s ${stage} -o ${output} ${CMAKE_CURRENT_SOURCE_DIR}/shaders/present.${stage}
+		DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/shaders/present.${stage}
+		COMMENT "Compiling shader present.${stage}"
+		VERBATIM
+	)
+	list(APPEND RTCW_SHADER_OUTPUTS ${output})
+endforeach()
+
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/shaders/rtcw.frag)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/shaders/rtcw.frag RTCW_FRAGMENT_BODY)
 

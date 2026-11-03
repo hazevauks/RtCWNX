@@ -47,6 +47,9 @@ void randomGet (void *buf, size_t len);
 
 /* applet */
 enum { AppletType_Application = 0, AppletType_SystemApplication = 1 };
+enum { ApmCpuBoostMode_Normal = 0, ApmCpuBoostMode_FastLoad = 1 };
+Result appletSetCpuBoostMode (int mode);
+Result romfsMountFromFsdev (const char *path, u64 offset, const char *name);
 bool appletMainLoop (void);
 int appletGetAppletType (void);
 

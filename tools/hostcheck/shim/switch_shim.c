@@ -230,6 +230,18 @@ void randomGet (void *buf, size_t len)
 	memset(buf, 0x5a, len);
 }
 
+Result appletSetCpuBoostMode (int mode)
+{
+	(void) mode;
+	return 0;
+}
+
+Result romfsMountFromFsdev (const char *path, u64 offset, const char *name)
+{
+	(void) path; (void) offset; (void) name;
+	return 0;
+}
+
 int appletGetAppletType (void)
 {
 	return AppletType_Application;

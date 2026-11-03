@@ -3831,6 +3831,10 @@ static void CG_Draw2D(stereoFrame_t stereoFrame) {
 		// -NERVE - SMF
 	}
 
+#ifdef __SWITCH__
+	CG_DrawWeaponWheel();
+#endif
+
 	// Ridah, draw flash blends now
 	CG_DrawFlashBlend();
 }

@@ -52,7 +52,7 @@ void GLimp_Init (qboolean fixedFunction)
 	glConfig.displayFrequency = 60;
 	glConfig.driverType = GLDRV_ICD;
 	glConfig.hardwareType = GLHW_GENERIC;
-	glConfig.deviceSupportsGamma = qfalse;
+	glConfig.deviceSupportsGamma = qtrue;
 	glConfig.textureCompression = TC_NONE;
 	glConfig.textureEnvAddAvailable = qtrue;
 	glConfig.numTextureUnits = DEV_MAX_TEXTURE_UNITS;
@@ -94,7 +94,5 @@ void GLimp_LogComment (char *comment)
 
 void GLimp_SetGamma (unsigned char red[256], unsigned char green[256], unsigned char blue[256])
 {
-	(void) red;
-	(void) green;
-	(void) blue;
+	DEV_SetGammaTable(red, green, blue);
 }

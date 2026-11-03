@@ -8,6 +8,9 @@
 /* nx_main.c: ends the engine's thread, and main takes the process out from there */
 void NX_ExitEngine (int code) __attribute__((noreturn));
 
+/* nx_main.c: the CPU at its top speed through a load, and at its usual one in play */
+void NX_SetLoadingBoost (int enable);
+
 /* nx_log.c */
 void NX_LogInit (void);
 void NX_LogShutdown (void);

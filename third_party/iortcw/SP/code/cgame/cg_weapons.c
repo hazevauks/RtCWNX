@@ -6159,3 +6159,7 @@ void CG_ClientDamage( int entnum, int enemynum, int id ) {
 		trap_SendClientCommand( va( "cld %i %i %i", entnum, enemynum, id ) );
 	}
 }
+
+#ifdef __SWITCH__
+#include "cg_wheel.inc"
+#endif

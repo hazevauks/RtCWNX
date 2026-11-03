@@ -628,6 +628,17 @@ vm_t *VM_Create( const char *module, intptr_t (*systemCalls)(intptr_t *),
 		Com_Error( ERR_FATAL, "VM_Create: no module named %s", module );
 	}
 	vm->systemCall = systemCalls;
+#ifndef DEDICATED
+	// A client tells pure servers which pk3 its cgame and ui come from. These are built in,
+	// but the pk3 is there, and touching what the PC game would load gives the same answer.
+	if ( Q_stricmp( module, "qagame" ) ) {
+		fileHandle_t f;
+
+		if ( FS_FOpenFileRead( Sys_GetDLLName( module ), &f, qfalse ) > 0 ) {
+			FS_FCloseFile( f );
+		}
+	}
+#endif
 	return vm;
 #endif
 

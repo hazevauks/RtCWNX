@@ -29,7 +29,7 @@ jobs:
         run: python3 tools/check_repo.py
 
       - name: Libraries
-        run: dkp-pacman -Sy --noconfirm --needed switch-dev switch-cmake deko3d uam switch-mesa switch-libdrm_nouveau switch-libjpeg-turbo switch-zlib
+        run: dkp-pacman -Sy --noconfirm --needed switch-dev switch-cmake deko3d uam switch-mesa switch-libjpeg-turbo switch-zlib
 
       - name: Build
         run: ./build.sh
@@ -73,3 +73,28 @@ jobs:
         with:
           files: RtCWNX.zip
           draft: true
+
+  # The same game on OpenGL through Mesa: it tells a problem of the platform from one of the native renderer.
+  fallback:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build tools
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq cmake ninja-build python3
+
+      - name: Libraries
+        run: dkp-pacman -Sy --noconfirm --needed switch-dev switch-cmake switch-mesa switch-libdrm_nouveau switch-libjpeg-turbo switch-zlib
+
+      - name: Build
+        run: ./build.sh -DRTCW_RENDERER_BACKEND=opengl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RtCWNX_fallback_opengl
+          path: SD_CARD/
+          if-no-files-found: error

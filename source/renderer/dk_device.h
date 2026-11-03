@@ -105,6 +105,9 @@ void DEV_Draw (GLenum mode, int first, int count);
 void DEV_DrawIndexed (GLenum mode, devAddr_t indices, int count);
 
 void DEV_Clear (GLbitfield mask, const float *color, float depth, int stencil);
+
+/* What a PC does with its video card's gamma ramp: applied to the frame as it is shown. */
+void DEV_SetGammaTable (const unsigned char *red, const unsigned char *green, const unsigned char *blue);
 void DEV_Present (void);
 
 /* The screen as OpenGL gives it: rows from the bottom, tightly packed RGBA. */

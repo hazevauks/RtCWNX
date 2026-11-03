@@ -435,9 +435,10 @@ qboolean Sys_DllExtension (const char *name)
 	return qfalse;
 }
 
+/* What a PC would load: the pure check asks for it by name. See VM_Create. */
 char *Sys_GetDLLName (const char *name)
 {
-	return va("%s" DLL_EXT, name);
+	return va("%s_mp_x86.dll", name);
 }
 
 /* The menus' "Multiplayer" and "Single Player" entries start the other game. */

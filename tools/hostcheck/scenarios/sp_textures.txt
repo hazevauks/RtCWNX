@@ -1,0 +1,13 @@
+# What the heaviest maps ask for, at the texture quality this is started with.
+60 cmd spmap swf
+560 press A
+562 release A
+760 stats swf
+765 cmd meminfo
+770 cmd spmap dam
+1270 press A
+1272 release A
+1470 shot textures_dam
+1475 stats dam
+1480 cmd meminfo
+1490 quit

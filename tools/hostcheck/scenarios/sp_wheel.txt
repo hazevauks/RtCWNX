@@ -1,0 +1,38 @@
+# The weapon wheel and the buttons around it, with every weapon in hand.
+60 cmd spdevmap escape2
+500 press A
+502 release A
+900 cmd give all
+1000 press RIGHT
+1030 stick R 20000 20000
+1060 shot wheel_open
+1100 stick R 0 0
+1102 release RIGHT
+1200 shot wheel_chose
+1300 press RIGHT
+1302 release RIGHT
+1400 shot wheel_tap
+1500 press X
+1502 release X
+1600 press Y
+1602 release Y
+1700 press B
+1760 shot crouch
+1800 release B
+1900 press A
+1902 release A
+1950 shot jump
+2000 press ZL
+2060 shot binoculars
+2100 release ZL
+2200 press PLUS
+2202 release PLUS
+2300 shot ingame_menu
+2400 press PLUS
+2402 release PLUS
+2500 press PLUS
+2502 press MINUS
+2504 release PLUS
+2504 release MINUS
+2600 shot console
+2700 quit

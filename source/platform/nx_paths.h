@@ -9,6 +9,11 @@
 
 #define NX_SP_NRO	NX_GAME_DIR "/RtCWNX.nro"
 #define NX_MP_NRO	NX_GAME_DIR "/mp/RtCWNX_MP.nro"
+#ifdef RTCW_MP
+#define NX_OWN_NRO	NX_MP_NRO
+#else
+#define NX_OWN_NRO	NX_SP_NRO
+#endif
 #define NX_LOG_DIR	NX_GAME_DIR "/SD_LOG"
 #define NX_ARGS_FILE	NX_GAME_DIR "/args.txt"
 

@@ -29,6 +29,10 @@ If you have questions concerning this license or the applicable additional terms
 // cl_main.c  -- client main loop
 
 #include "client.h"
+
+#ifdef __SWITCH__
+#include "nx_platform.h"
+#endif
 #include <limits.h>
 
 #ifdef __linux__
@@ -1365,6 +1369,9 @@ memory on the hunk from cgame, ui, and renderer
 =====================
 */
 void CL_MapLoading( void ) {
+#ifdef __SWITCH__
+	NX_SetLoadingBoost( qtrue );
+#endif
 	if ( com_dedicated->integer ) {
 		clc.state = CA_DISCONNECTED;
 		Key_SetCatcher( KEYCATCH_CONSOLE );

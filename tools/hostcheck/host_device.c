@@ -66,6 +66,8 @@ static devVertices_t		verts;
 static int			bound_texture[DEV_MAX_TEXTURE_UNITS];
 static devSampler_t		bound_sampler[DEV_MAX_TEXTURE_UNITS];
 
+static byte	gamma_table[3][256];
+
 static char	shot_name[64];
 static char	stats_name[64];
 static qboolean	rasterize;
@@ -814,6 +816,13 @@ qboolean DEV_DepthProbe (int id)
 	return qtrue;
 }
 
+void DEV_SetGammaTable (const unsigned char *red, const unsigned char *green, const unsigned char *blue)
+{
+	memcpy(gamma_table[0], red, 256);
+	memcpy(gamma_table[1], green, 256);
+	memcpy(gamma_table[2], blue, 256);
+}
+
 void DEV_ReadScreen (int x, int y, int width, int height, void *rgba)
 {
 	byte	*out = rgba;
@@ -905,9 +914,9 @@ static void WriteShot (const char *name)
 		*out++ = 0;
 		for (x = 0; x < SCREEN_W; x++)
 		{
-			*out++ = in[0];
-			*out++ = in[1];
-			*out++ = in[2];
+			*out++ = gamma_table[0][in[0]];
+			*out++ = gamma_table[1][in[1]];
+			*out++ = gamma_table[2][in[2]];
 			in += 4;
 		}
 	}

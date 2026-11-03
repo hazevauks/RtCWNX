@@ -90,7 +90,7 @@ static const defaultBind_t default_binds[] =
 	{ K_JOY3,	"+reload" },		/* X: reload */
 	{ K_JOY4,	"+activate" },		/* Y: use, open, pick up */
 	{ K_JOY11,	"+sprint" },		/* left stick click: sprint */
-	{ K_JOY16,	"weapnext" },		/* D-pad right: next weapon */
+	{ K_JOY16,	"+weaponwheel" },	/* D-pad right: a tap for the next weapon, held for the wheel */
 	{ K_JOY15,	"weapprev" },		/* D-pad left: previous weapon */
 	{ K_JOY13,	"weapalt" },		/* D-pad up: scope, silencer, the weapon's other mode */
 #ifdef RTCW_MP
@@ -125,6 +125,7 @@ static const defaultCvar_t default_cvars[] =
 static cvar_t	*in_nxDeadZone;
 static cvar_t	*in_nxInvertLook;
 static cvar_t	*in_nxBindsVersion;
+static cvar_t	*nx_wheel;
 static cvar_t	*sensitivity_cvar;
 
 static bool	input_ready;
@@ -381,6 +382,17 @@ static void UpdateGameSticks (HidAnalogStickState left, HidAnalogStickState righ
 
 	SendAxis(0, (int) (lx * STICK_MAX));
 	SendAxis(1, (int) (-ly * STICK_MAX));	/* up is forward */
+
+	/* the weapon wheel has the right stick while it is open */
+	if (nx_wheel->integer)
+	{
+		SendAxis(2, 0);
+		SendAxis(3, 0);
+		Cvar_SetValue("nx_wheelX", right.x / STICK_MAX);
+		Cvar_SetValue("nx_wheelY", right.y / STICK_MAX);
+		return;
+	}
+
 	SendAxis(2, (int) (rx * STICK_MAX * speed));
 	SendAxis(3, (int) ((in_nxInvertLook->integer ? ry : -ry) * STICK_MAX * speed));
 }
@@ -487,6 +499,12 @@ void IN_Frame (void)
 	RunAppletLoop();
 	padUpdate(&pad);
 
+	/* a load is over: what comes now has to keep to the usual clocks */
+	if (clc.state == CA_ACTIVE || clc.state == CA_DISCONNECTED || clc.state == CA_CINEMATIC)
+		NX_SetLoadingBoost(0);
+	else
+		NX_SetLoadingBoost(1);
+
 	new_mode = CurrentMode();
 	if (new_mode != mode)
 	{
@@ -538,6 +556,7 @@ void IN_Init (void *windowData)
 	in_nxDeadZone = Cvar_Get("in_nxDeadZone", "0.12", CVAR_ARCHIVE);
 	in_nxInvertLook = Cvar_Get("in_nxInvertLook", "0", CVAR_ARCHIVE);
 	in_nxBindsVersion = Cvar_Get("in_nxBindsVersion", "0", CVAR_ARCHIVE);
+	nx_wheel = Cvar_Get("nx_wheel", "0", CVAR_ROM);
 	sensitivity_cvar = Cvar_Get("sensitivity", "5", CVAR_ARCHIVE);
 
 	ApplyDefaultLayout();

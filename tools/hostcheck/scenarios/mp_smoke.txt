@@ -1,0 +1,26 @@
+# The multiplayer game: its menus, a local server on two maps, with the team menu and a spawn.
+120 shot mp_01_menu
+130 stats menu
+300 press RIGHT
+302 release RIGHT
+320 shot mp_02_focus
+400 cmd map mp_beach
+1000 shot mp_03_limbo
+1005 stats limbo
+1010 cmd team r
+1200 shot mp_04_team
+1205 cmd +attack
+1210 cmd -attack
+1500 shot mp_05_spawned
+1505 stats spawned
+1510 press ZR
+1540 release ZR
+1600 shot mp_06_firing
+1610 stick L 0 32767
+1700 stick L 0 0
+1710 shot mp_07_moved
+1800 cmd map mp_village
+2500 cmd team b
+2800 shot mp_08_village
+2805 stats village
+2900 quit

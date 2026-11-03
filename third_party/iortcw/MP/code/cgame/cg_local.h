@@ -1989,6 +1989,11 @@ void CG_NextWeapon_f( void );
 void CG_PrevWeapon_f( void );
 void CG_Weapon_f( void );
 void CG_WeaponBank_f( void );
+#ifdef __SWITCH__
+void CG_WheelDown_f( void );
+void CG_WheelUp_f( void );
+void CG_DrawWeaponWheel( void );
+#endif
 
 void CG_FinishWeaponChange( int lastweap, int newweap );
 

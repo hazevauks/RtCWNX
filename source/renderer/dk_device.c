@@ -4,6 +4,10 @@
  * and winding work unchanged. The screen's first row is its top, which differs from
  * OpenGL in viewports, scissors and read backs, all converted here.
  *
+ * A frame is drawn to an image of its own. Showing it is one more pass, through the
+ * game's gamma table, which on a PC is the video card's ramp: the brightness setting
+ * works as it does there, right away and without touching what blends in the frame.
+ *
  * State only marks what it touches. Flush writes the commands for what really
  * changed, right before the draw that needs it.
  *
@@ -33,12 +37,12 @@
 
 #define KB			1024u
 #define MB			(1024u * 1024u)
-#define CMD_MEMORY_PER_FRAME	(4 * MB)
-#define CMD_MEMORY_OVERFLOW	(4 * MB)
+#define CMD_MEMORY_PER_FRAME	(2 * MB)
+#define CMD_MEMORY_OVERFLOW	(2 * MB)
 #define CMD_MEMORY_GAP		256
 #define UPLOAD_CMD_MEMORY	(1 * MB)
-#define UPLOAD_STAGING_SIZE	(32 * MB)
-#define STREAM_PER_FRAME	(32 * MB)
+#define UPLOAD_STAGING_SIZE	(16 * MB)
+#define STREAM_PER_FRAME	(8 * MB)	/* the campaign's maps stay under 1 MB (docs/status.md) */
 #define SHADER_CODE_SIZE	(256 * KB)
 #define ZERO_BUFFER_SIZE	(128 * KB)
 #define IMAGE_BLOCK_SIZE	(64 * MB)
@@ -46,6 +50,14 @@
 #define MAX_FREE_RANGES		2048
 #define MAX_SAMPLERS		64
 #define PROBE_REPORT_SIZE	16
+
+/* Descriptors past the textures' and samplers' */
+#define IMAGE_SCENE		DEV_MAX_TEXTURES
+#define IMAGE_GAMMA		(DEV_MAX_TEXTURES + 1)
+#define NUM_IMAGE_DESCRIPTORS	(DEV_MAX_TEXTURES + 2)
+#define SAMPLER_SCENE		MAX_SAMPLERS
+#define SAMPLER_GAMMA		(MAX_SAMPLERS + 1)
+#define NUM_SAMPLER_DESCRIPTORS	(MAX_SAMPLERS + 2)
 
 #define ALIGN_UP(value, align)	(((value) + (align) - 1) & ~((align) - 1))
 
@@ -99,9 +111,13 @@ static DkCmdBuf		upload_cmd;	/* transfers, submitted ahead of the frame */
 static DkSwapchain	swapchain;
 static DkImage		color_images[SWAP_IMAGES];
 static DkImage		depth_image;
+static DkImage		scene_image;
+static DkImage		gamma_image;
 static DkImageView	color_views[SWAP_IMAGES];
 static DkImageView	depth_view;
-static int		image_slot = -1;
+static DkImageView	scene_view;
+static DkImageView	gamma_view;
+static qboolean		frame_open;
 static int		frame_index;
 static unsigned		frame_count;
 static int		screen_width, screen_height;
@@ -116,6 +132,7 @@ static DkMemBlock	code_block;
 static DkMemBlock	descriptor_block;
 static DkMemBlock	uniform_block;
 static DkMemBlock	probe_block;
+static DkMemBlock	gamma_block;
 
 static DkFence		frame_fences[FRAMES_IN_FLIGHT];
 static qboolean		frame_fence_used[FRAMES_IN_FLIGHT];
@@ -142,6 +159,8 @@ static int		num_samplers;
 /* Shaders */
 static DkShader		vertex_shader;
 static DkShader		fragment_shaders[DEV_FS_COUNT][2];
+static DkShader		present_vertex_shader;
+static DkShader		present_fragment_shader;
 
 /* What is set, and what the GPU has yet to hear of */
 static unsigned			dirty;
@@ -423,7 +442,7 @@ static DkImageDescriptor *ImageDescriptors (void)
 static DkSamplerDescriptor *SamplerDescriptors (void)
 {
 	return (DkSamplerDescriptor *) ((byte *) dkMemBlockGetCpuAddr(descriptor_block)
-			+ DEV_MAX_TEXTURES * sizeof(DkImageDescriptor));
+			+ NUM_IMAGE_DESCRIPTORS * sizeof(DkImageDescriptor));
 }
 
 /* deko3D 0.5.0 picks an image's tile height from 1.5 times its height, and its layout
@@ -802,19 +821,18 @@ static void BeginFrame (void)
 		{ 2 * sizeof(float), 0 },
 		{ 2 * sizeof(float), 0 },
 	};
-	const DkImageView	*color;
+	const DkImageView	*color = &scene_view;
 
-	if (image_slot >= 0)
+	if (frame_open)
 		return;
+	frame_open = qtrue;
 
 	SubmitUploads();
-	CheckQueue("acquire");
-	image_slot = dkQueueAcquireImage(queue, swapchain);
+	CheckQueue("begin");
 
-	color = &color_views[image_slot];
 	dkCmdBufBindRenderTargets(cmd, &color, 1, &depth_view);
-	dkCmdBufBindImageDescriptorSet(cmd, dkMemBlockGetGpuAddr(descriptor_block), DEV_MAX_TEXTURES);
-	dkCmdBufBindSamplerDescriptorSet(cmd, dkMemBlockGetGpuAddr(descriptor_block) + DEV_MAX_TEXTURES * sizeof(DkImageDescriptor), MAX_SAMPLERS);
+	dkCmdBufBindImageDescriptorSet(cmd, dkMemBlockGetGpuAddr(descriptor_block), NUM_IMAGE_DESCRIPTORS);
+	dkCmdBufBindSamplerDescriptorSet(cmd, dkMemBlockGetGpuAddr(descriptor_block) + NUM_IMAGE_DESCRIPTORS * sizeof(DkImageDescriptor), NUM_SAMPLER_DESCRIPTORS);
 	dkCmdBufBarrier(cmd, DkBarrier_None, DkInvalidateFlags_Descriptors | DkInvalidateFlags_Shader);
 	dkCmdBufBindMultisampleState(cmd, &multisample);
 	dkCmdBufBindVtxAttribState(cmd, attribs, 4);
@@ -998,19 +1016,79 @@ static void LogPerformance (void)
 	}
 }
 
+void DEV_SetGammaTable (const unsigned char *red, const unsigned char *green, const unsigned char *blue)
+{
+	DkGpuAddr	source;
+	byte		*space = UploadSpace(256 * 4, 16, &source);
+	DkCopyBuf	buffer = { source, 256 * 4, 256 * 4 };
+	DkImageRect	rect = { 0, 0, 0, 256, 1, 1 };
+	int		i;
+
+	for (i = 0; i < 256; i++)
+	{
+		space[i * 4 + 0] = red[i];
+		space[i * 4 + 1] = green[i];
+		space[i * 4 + 2] = blue[i];
+		space[i * 4 + 3] = 255;
+	}
+	dkCmdBufCopyBufferToImage(upload_cmd, &buffer, &gamma_view, &rect, 0);
+}
+
+/* The frame, through the gamma table, onto the image the system shows. */
+static void DrawToScreen (int slot)
+{
+	const DkImageView	*color = &color_views[slot];
+	const DkShader		*shaders[2] = { &present_vertex_shader, &present_fragment_shader };
+	DkViewport		viewport = { 0, 0, (float) screen_width, (float) screen_height, 0, 1 };
+	DkScissor		scissor = { 0, 0, (uint32_t) screen_width, (uint32_t) screen_height };
+	DkRasterizerState	plain_rasterizer;
+	DkColorState		plain_color;
+	DkColorWriteState	plain_write;
+	DkDepthStencilState	plain_depth;
+
+	dkRasterizerStateDefaults(&plain_rasterizer);
+	plain_rasterizer.cullMode = DkFace_None;
+	dkColorStateDefaults(&plain_color);
+	dkColorWriteStateDefaults(&plain_write);
+	dkDepthStencilStateDefaults(&plain_depth);
+	plain_depth.depthTestEnable = false;
+	plain_depth.depthWriteEnable = false;
+
+	dkCmdBufDiscardDepthStencil(cmd);
+	dkCmdBufBarrier(cmd, DkBarrier_Fragments, DkInvalidateFlags_Image);
+	dkCmdBufBindRenderTargets(cmd, &color, 1, NULL);
+	dkCmdBufSetViewports(cmd, 0, &viewport, 1);
+	dkCmdBufSetScissors(cmd, 0, &scissor, 1);
+	dkCmdBufBindRasterizerState(cmd, &plain_rasterizer);
+	dkCmdBufBindColorState(cmd, &plain_color);
+	dkCmdBufBindColorWriteState(cmd, &plain_write);
+	dkCmdBufBindDepthStencilState(cmd, &plain_depth);
+	dkCmdBufBindShaders(cmd, DkStageFlag_GraphicsMask, shaders, 2);
+	dkCmdBufBindVtxAttribState(cmd, NULL, 0);
+	dkCmdBufBindVtxBufferState(cmd, NULL, 0);
+	dkCmdBufBindTexture(cmd, DkStage_Fragment, 0, dkMakeTextureHandle(IMAGE_SCENE, SAMPLER_SCENE));
+	dkCmdBufBindTexture(cmd, DkStage_Fragment, 1, dkMakeTextureHandle(IMAGE_GAMMA, SAMPLER_GAMMA));
+	dkCmdBufDraw(cmd, DkPrimitive_Triangles, 3, 1, 0, 0);
+}
+
 void DEV_Present (void)
 {
+	int	slot;
+
 	BeginFrame();
 	SubmitUploads();
 	CheckQueue("present");
 	LogPerformance();
 
-	dkCmdBufDiscardDepthStencil(cmd);
+	/* the wait for a free screen is here, after all of the frame's own work */
+	slot = dkQueueAcquireImage(queue, swapchain);
+	DrawToScreen(slot);
+
 	dkCmdBufSignalFence(cmd, &frame_fences[frame_index], true);
 	dkQueueSubmitCommands(queue, dkCmdBufFinishList(cmd));
-	dkQueuePresentImage(queue, swapchain, image_slot);
+	dkQueuePresentImage(queue, swapchain, slot);
 	frame_fence_used[frame_index] = qtrue;
-	image_slot = -1;
+	frame_open = qfalse;
 	frame_count++;
 
 	/* this slice of command and vertex memory is free once its last frame is done */
@@ -1074,7 +1152,7 @@ void DEV_ReadScreen (int x, int y, int width, int height, void *rgba)
 	dst.y = 0;
 
 	dkCmdBufBarrier(cmd, DkBarrier_Fragments, DkInvalidateFlags_Image);
-	dkCmdBufBlitImage(cmd, &color_views[image_slot], &src, &capture_view, &dst, DkBlitFlag_FlipY, 0);
+	dkCmdBufBlitImage(cmd, &scene_view, &src, &capture_view, &dst, DkBlitFlag_FlipY, 0);
 	dkCmdBufBarrier(cmd, DkBarrier_Primitives, DkInvalidateFlags_Image);
 
 	/* whatever is in the staging memory has to go first */
@@ -1091,7 +1169,7 @@ void DEV_ReadScreen (int x, int y, int width, int height, void *rgba)
 	CheckQueue("read back");
 	memcpy(rgba, space, size);
 
-	color = &color_views[image_slot];
+	color = &scene_view;
 	dkCmdBufBindRenderTargets(cmd, &color, 1, &depth_view);
 }
 
@@ -1124,7 +1202,8 @@ STARTING AND STOPPING
 static void CreateFramebuffers (void)
 {
 	DkImageLayoutMaker	maker;
-	DkImageLayout		depth_layout, color_layout;
+	DkImageLayout		depth_layout, color_layout, gamma_layout;
+	DkSampler		plain_sampler;
 	DkSwapchainMaker	swap_maker;
 	const DkImage		*swap_images[SWAP_IMAGES];
 	uint32_t		depth_size, color_size, color_align, offset_color;
@@ -1146,10 +1225,33 @@ static void CreateFramebuffers (void)
 	color_size = ALIGN_UP((uint32_t) dkImageLayoutGetSize(&color_layout), color_align);
 	offset_color = ALIGN_UP(depth_size, color_align);
 
-	framebuffer_block = MakeBlock(offset_color + color_size * SWAP_IMAGES, DkMemBlockFlags_GpuCached | DkMemBlockFlags_Image);
+	/* the frame's own image is laid out as the screen's, one more of them */
+	framebuffer_block = MakeBlock(offset_color + color_size * (SWAP_IMAGES + 1), DkMemBlockFlags_GpuCached | DkMemBlockFlags_Image);
 
 	dkImageInitialize(&depth_image, &depth_layout, framebuffer_block, 0);
 	dkImageViewDefaults(&depth_view, &depth_image);
+
+	dkImageInitialize(&scene_image, &color_layout, framebuffer_block, offset_color + SWAP_IMAGES * color_size);
+	dkImageViewDefaults(&scene_view, &scene_image);
+	dkImageDescriptorInitialize(&ImageDescriptors()[IMAGE_SCENE], &scene_view, false, false);
+
+	/* the gamma table, as a row of pixels */
+	dkImageLayoutMakerDefaults(&maker, device);
+	maker.format = DkImageFormat_RGBA8_Unorm;
+	maker.dimensions[0] = 256;
+	maker.dimensions[1] = 1;
+	dkImageLayoutInitialize(&gamma_layout, &maker);
+	gamma_block = MakeBlock((uint32_t) dkImageLayoutGetSize(&gamma_layout), DkMemBlockFlags_GpuCached | DkMemBlockFlags_Image);
+	dkImageInitialize(&gamma_image, &gamma_layout, gamma_block, 0);
+	dkImageViewDefaults(&gamma_view, &gamma_image);
+	dkImageDescriptorInitialize(&ImageDescriptors()[IMAGE_GAMMA], &gamma_view, false, false);
+
+	dkSamplerDefaults(&plain_sampler);
+	plain_sampler.minFilter = plain_sampler.magFilter = DkFilter_Nearest;
+	plain_sampler.wrapMode[0] = plain_sampler.wrapMode[1] = plain_sampler.wrapMode[2] = DkWrapMode_ClampToEdge;
+	dkSamplerDescriptorInitialize(&SamplerDescriptors()[SAMPLER_SCENE], &plain_sampler);
+	plain_sampler.minFilter = plain_sampler.magFilter = DkFilter_Linear;
+	dkSamplerDescriptorInitialize(&SamplerDescriptors()[SAMPLER_GAMMA], &plain_sampler);
 
 	for (i = 0; i < SWAP_IMAGES; i++)
 	{
@@ -1207,6 +1309,9 @@ static void LoadShaders (void)
 
 	if (!LoadShaderFile("rtcw_vert", &vertex_shader, &code_head))
 		ri.Error(ERR_FATAL, "deko3D: missing shader rtcw_vert");
+	if (!LoadShaderFile("present_vert", &present_vertex_shader, &code_head)
+			|| !LoadShaderFile("present_frag", &present_fragment_shader, &code_head))
+		ri.Error(ERR_FATAL, "deko3D: missing the present shaders");
 	for (i = 0; i < DEV_FS_COUNT; i++)
 	{
 		char	name[64];
@@ -1246,7 +1351,7 @@ qboolean DEV_Init (int *width, int *height)
 	stream_block = MakeBlock(FRAMES_IN_FLIGHT * STREAM_PER_FRAME, uncached);
 	zero_block = MakeBlock(ZERO_BUFFER_SIZE, uncached);
 	code_block = MakeBlock(SHADER_CODE_SIZE, uncached | DkMemBlockFlags_Code);
-	descriptor_block = MakeBlock(DEV_MAX_TEXTURES * sizeof(DkImageDescriptor) + MAX_SAMPLERS * sizeof(DkSamplerDescriptor), uncached);
+	descriptor_block = MakeBlock(NUM_IMAGE_DESCRIPTORS * sizeof(DkImageDescriptor) + NUM_SAMPLER_DESCRIPTORS * sizeof(DkSamplerDescriptor), uncached);
 	uniform_block = MakeBlock(2 * DK_UNIFORM_BUF_ALIGNMENT + sizeof(devVertexUniforms_t) + 16, uncached);
 	probe_block = MakeBlock(FRAMES_IN_FLIGHT * DEV_MAX_DEPTH_PROBES * 2 * PROBE_REPORT_SIZE, uncached);
 
@@ -1274,7 +1379,7 @@ qboolean DEV_Init (int *width, int *height)
 
 	frame_index = 0;
 	frame_count = 0;
-	image_slot = -1;
+	frame_open = qfalse;
 	stream_head = 0;
 	staging_head = 0;
 	staging_fence_used = qfalse;
@@ -1336,6 +1441,7 @@ void DEV_Shutdown (void)
 		dkMemBlockDestroy(image_blocks[i].block);
 		free(image_blocks[i].ranges);
 	}
+	dkMemBlockDestroy(gamma_block);
 	dkMemBlockDestroy(probe_block);
 	dkMemBlockDestroy(uniform_block);
 	dkMemBlockDestroy(descriptor_block);

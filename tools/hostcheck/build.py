@@ -119,7 +119,7 @@ def main():
         defines.append("-DRTCW_MP")
     base = ["-std=gnu11", "-O1", "-g", "-fsigned-char", "-fno-strict-aliasing", "-fno-omit-frame-pointer", "-w"] + extra
     includes = ["-I%s" % posix(p) for p in (ROOT / "tools/hostcheck/shim", ROOT / "tools/hostcheck", ROOT / "source/platform",
-                                     ROOT / "source/renderer", code, code / "sys", include,
+                                     ROOT / "source/renderer", ROOT / "source/game", code, code / "sys", include,
                                      upstream / "jpeg-8c", upstream / "zlib-1.2.11")]
     cc = [args.gcc] + base + defines + includes
 
