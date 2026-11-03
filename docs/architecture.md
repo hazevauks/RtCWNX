@@ -139,9 +139,9 @@ by default on a PC, and its thread doubles the samples to the 48 kHz that `audou
 
 ## Why not SDL2 or OpenAL
 
-The first plan had SDL2 for input and audio. But the Switch's SDL2 links its video driver, and with it all of Mesa,
-which takes the NRO from 3.4 MB to about 30, for what libnx does in a few hundred lines. OpenAL Soft on the Switch goes
-through SDL2 too. So the port uses libnx directly, as PreyNX does.
+The first plan had SDL2 for input and audio. But the Switch's SDL2 links its video driver, and with it all of Mesa, for
+what libnx does in a few hundred lines: Mesa alone, in the fallback build, takes the NRO from 3.4 MB to 8.6. OpenAL Soft on
+the Switch goes through SDL2 too. So the port uses libnx directly, as PreyNX does.
 
 ## Input
 
