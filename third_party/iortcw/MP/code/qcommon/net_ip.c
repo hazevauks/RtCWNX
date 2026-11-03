@@ -81,7 +81,7 @@ static qboolean	winsockInitialized = qfalse;
 #		include <sys/filio.h>
 #	endif
 
-#	ifdef __SWITCH__
+#	if defined(__SWITCH__) && !defined(NX_HOSTCHECK)
 // libnx's headers leave IPv6 multicast out, and the port opens no IPv6 socket
 struct ipv6_mreq {
 	struct in6_addr ipv6mr_multiaddr;

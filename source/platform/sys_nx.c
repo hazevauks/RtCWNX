@@ -175,8 +175,17 @@ FILE *Sys_FOpen (const char *ospath, const char *mode)
 	return f;
 }
 
+/* The engine creates each folder of a path in turn, and treats a failure as fatal:
+ * "sdmc:" and the folders that are there already have to count as made. */
 qboolean Sys_Mkdir (const char *path)
 {
+	const size_t	length = strlen(path);
+	struct stat	buf;
+
+	if (length && path[length - 1] == ':')
+		return qtrue;
+	if (stat(path, &buf) == 0 && S_ISDIR(buf.st_mode))
+		return qtrue;
 	return (mkdir(path, 0777) == 0 || errno == EEXIST) ? qtrue : qfalse;
 }
 

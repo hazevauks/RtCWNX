@@ -1,0 +1,164 @@
+# Loads every map of the single player campaign, starts it, and takes a picture.
+# The stats line of each is what it asks of the console.
+100 cmd spmap escape1
++500 press A
++2 release A
++200 shot map_escape1
++2 stats escape1
++2 cmd meminfo
++4 cmd spmap escape2
++500 press A
++2 release A
++200 shot map_escape2
++2 stats escape2
++2 cmd meminfo
++4 cmd spmap tram
++500 press A
++2 release A
++200 shot map_tram
++2 stats tram
++2 cmd meminfo
++4 cmd spmap village1
++500 press A
++2 release A
++200 shot map_village1
++2 stats village1
++2 cmd meminfo
++4 cmd spmap crypt1
++500 press A
++2 release A
++200 shot map_crypt1
++2 stats crypt1
++2 cmd meminfo
++4 cmd spmap crypt2
++500 press A
++2 release A
++200 shot map_crypt2
++2 stats crypt2
++2 cmd meminfo
++4 cmd spmap church
++500 press A
++2 release A
++200 shot map_church
++2 stats church
++2 cmd meminfo
++4 cmd spmap boss1
++500 press A
++2 release A
++200 shot map_boss1
++2 stats boss1
++2 cmd meminfo
++4 cmd spmap forest
++500 press A
++2 release A
++200 shot map_forest
++2 stats forest
++2 cmd meminfo
++4 cmd spmap rocket
++500 press A
++2 release A
++200 shot map_rocket
++2 stats rocket
++2 cmd meminfo
++4 cmd spmap baseout
++500 press A
++2 release A
++200 shot map_baseout
++2 stats baseout
++2 cmd meminfo
++4 cmd spmap assault
++500 press A
++2 release A
++200 shot map_assault
++2 stats assault
++2 cmd meminfo
++4 cmd spmap sfm
++500 press A
++2 release A
++200 shot map_sfm
++2 stats sfm
++2 cmd meminfo
++4 cmd spmap factory
++500 press A
++2 release A
++200 shot map_factory
++2 stats factory
++2 cmd meminfo
++4 cmd spmap trainyard
++500 press A
++2 release A
++200 shot map_trainyard
++2 stats trainyard
++2 cmd meminfo
++4 cmd spmap swf
++500 press A
++2 release A
++200 shot map_swf
++2 stats swf
++2 cmd meminfo
++4 cmd spmap norway
++500 press A
++2 release A
++200 shot map_norway
++2 stats norway
++2 cmd meminfo
++4 cmd spmap xlabs
++500 press A
++2 release A
++200 shot map_xlabs
++2 stats xlabs
++2 cmd meminfo
++4 cmd spmap boss2
++500 press A
++2 release A
++200 shot map_boss2
++2 stats boss2
++2 cmd meminfo
++4 cmd spmap dam
++500 press A
++2 release A
++200 shot map_dam
++2 stats dam
++2 cmd meminfo
++4 cmd spmap village2
++500 press A
++2 release A
++200 shot map_village2
++2 stats village2
++2 cmd meminfo
++4 cmd spmap chateau
++500 press A
++2 release A
++200 shot map_chateau
++2 stats chateau
++2 cmd meminfo
++4 cmd spmap dark
++500 press A
++2 release A
++200 shot map_dark
++2 stats dark
++2 cmd meminfo
++4 cmd spmap dig
++500 press A
++2 release A
++200 shot map_dig
++2 stats dig
++2 cmd meminfo
++4 cmd spmap castle
++500 press A
++2 release A
++200 shot map_castle
++2 stats castle
++2 cmd meminfo
++4 cmd spmap end
++500 press A
++2 release A
++200 shot map_end
++2 stats end
++2 cmd meminfo
++4 cmd spmap cutscene1
++500 press A
++2 release A
++200 shot map_cutscene1
++2 stats cutscene1
++2 quit

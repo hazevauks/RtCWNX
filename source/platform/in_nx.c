@@ -23,6 +23,8 @@
 #define STICK_MAX		32767.0f
 #define SCREEN_W		640.0f		/* the UI's virtual screen */
 #define SCREEN_H		480.0f
+#define PREGAME_ARROW_X		600	/* ui/pregame.menu's button, on that screen */
+#define PREGAME_ARROW_Y		450
 
 /* The version of the default layout: raising it sets the bindings anew. */
 #define BINDS_VERSION		1
@@ -230,6 +232,35 @@ static int KeyForMode (const buttonMap_t *map)
 	}
 }
 
+/* The UI only takes relative moves, and clamps them to the screen: a move large enough
+ * finds a corner to start from. Directly, because the event queue would add them up. */
+static void CursorTo (int x, int y)
+{
+	const int	now = Sys_Milliseconds();
+
+	CL_MouseEvent(-(int) SCREEN_W * 2, -(int) SCREEN_H * 2, now);
+	CL_MouseEvent(x, y, now);
+	cursor_x = x;
+	cursor_y = y;
+}
+
+/* After a level loads, the single player game waits on a screen whose one way out is
+ * an arrow in a corner, for the mouse. The buttons that say "go on" press it. */
+static bool ClickPregameArrow (void)
+{
+#ifndef RTCW_MP
+	if (uivm && VM_Call(uivm, UI_GET_ACTIVE_MENU) == UIMENU_PREGAME)
+	{
+		CursorTo(PREGAME_ARROW_X, PREGAME_ARROW_Y);
+		/* entering the arrow shows the button that takes the click, and moving on it finds it */
+		CL_MouseEvent(1, 1, Sys_Milliseconds());
+		TapKey(K_MOUSE1);
+		return true;
+	}
+#endif
+	return false;
+}
+
 static void PressButton (size_t i)
 {
 	int	key = KeyForMode(&button_map[i]);
@@ -239,9 +270,11 @@ static void PressButton (size_t i)
 		KeyboardForMode();
 		return;
 	}
+	if ((key == KEY_SELECT || key == K_MOUSE1 || key == K_ESCAPE) && mode == MODE_MENU && ClickPregameArrow())
+		return;
 	if (key == KEY_SELECT)
 		key = cursor_by_pad ? K_ENTER : K_MOUSE1;
-	if (key == K_UPARROW || key == K_DOWNARROW)
+	if (key == K_UPARROW || key == K_DOWNARROW || key == K_LEFTARROW || key == K_RIGHTARROW)
 		cursor_by_pad = true;
 
 	PostKey(key, true);
@@ -385,34 +418,19 @@ static void UpdateMenuCursor (HidAnalogStickState left, HidAnalogStickState righ
 	MoveCursor((lx + rx) * speed, -(ly + ry) * speed);
 }
 
-/* A finger is a pointer that jumps: the UI only takes relative moves, and it clamps
- * them to the screen, so a large move first finds the corner it starts from. */
+/* A finger is a pointer that jumps. */
 static void UpdateTouch (void)
 {
 	HidTouchScreenState	state;
 
 	if (hidGetTouchScreenStates(&state, 1) && state.count > 0)
 	{
-		const float	x = state.touches[0].x * SCREEN_W / 1280.0f;
-		const float	y = state.touches[0].y * SCREEN_H / 720.0f;
-
+		CursorTo((int) (state.touches[0].x * SCREEN_W / 1280.0f), (int) (state.touches[0].y * SCREEN_H / 720.0f));
 		if (!touch_down)
 		{
-			Com_QueueEvent(Sys_Milliseconds(), SE_MOUSE, -(int) SCREEN_W * 2, -(int) SCREEN_H * 2, 0, NULL);
-			Com_QueueEvent(Sys_Milliseconds(), SE_MOUSE, (int) x, (int) y, 0, NULL);
 			PostKey(K_MOUSE1, true);
 			touch_down = true;
 		}
-		else
-		{
-			const int	dx = (int) x - (int) cursor_x;
-			const int	dy = (int) y - (int) cursor_y;
-
-			if (dx || dy)
-				Com_QueueEvent(Sys_Milliseconds(), SE_MOUSE, dx, dy, 0, NULL);
-		}
-		cursor_x = x;
-		cursor_y = y;
 		cursor_by_pad = false;
 	}
 	else if (touch_down)

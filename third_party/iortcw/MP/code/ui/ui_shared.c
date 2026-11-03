@@ -3169,6 +3169,10 @@ void Menu_HandleKey( menuDef_t *menu, int key, qboolean down ) {
 			DC->executeText( EXEC_APPEND, "screenshot\n" );
 		}
 		break;
+#ifdef __SWITCH__
+	// the D-pad's other two directions: the main menu's entries run across the screen
+	case K_LEFTARROW:
+#endif
 	case K_KP_UPARROW:
 	case K_UPARROW:
 		Menu_SetPrevCursorItem( menu );
@@ -3183,6 +3187,9 @@ void Menu_HandleKey( menuDef_t *menu, int key, qboolean down ) {
 		break;
 
 	case K_TAB:
+#ifdef __SWITCH__
+	case K_RIGHTARROW:
+#endif
 	case K_KP_DOWNARROW:
 	case K_DOWNARROW:
 		Menu_SetNextCursorItem( menu );

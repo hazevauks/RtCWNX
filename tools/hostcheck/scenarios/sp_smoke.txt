@@ -1,0 +1,38 @@
+# The title screen, a new game, a look around with the controller, a save and a load.
+120 shot 01_menu
+130 stats menu
+200 cmd spmap escape1
+# the briefing: it waits for a button
+700 shot 02_briefing
+710 press A
+712 release A
+800 shot 03_after_a
+900 press PLUS
+902 release PLUS
+1000 shot 04_after_plus
+1100 shot 05_game
+1105 stats game
+1110 press ZR
+1140 release ZR
+1160 shot 06_firing
+1200 stick L 0 32767
+1300 stick L 0 0
+1320 stick R 16000 0
+1360 stick R 0 0
+1400 shot 07_moved
+1405 stats moved
+1500 press L
+1520 shot 08_lean
+1540 release L
+1600 press MINUS
+1602 release MINUS
+1660 shot 09_notebook
+1700 press B
+1702 release B
+1800 cmd savegame hostcheck
+2000 cmd loadgame hostcheck
+2600 press PLUS
+2602 release PLUS
+2800 shot 10_after_load
+2805 stats after_load
+2900 quit
