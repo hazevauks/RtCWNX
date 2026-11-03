@@ -10,16 +10,20 @@ if(NOT NINTENDO_SWITCH)
 	message(FATAL_ERROR "RtCWNX targets the Nintendo Switch: configure it with the devkitA64 toolchain.")
 endif()
 
-set(RTCW_RENDERER_BACKEND "opengl" CACHE STRING "What draws: deko3d, or opengl (the fallback, through Mesa)")
+set(RTCW_RENDERER_BACKEND "deko3d" CACHE STRING "What draws: deko3d, or opengl (the fallback, through Mesa)")
 set_property(CACHE RTCW_RENDERER_BACKEND PROPERTY STRINGS deko3d opengl)
 
 set(NX_APP_NAME "Return to Castle Wolfenstein")
 set(NX_APP_AUTHOR "hazevauks")
 set(NX_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.jpg")
 set(RTCW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/iortcw")
+option(RTCW_DEKO3D_DEBUG "Link deko3D's debug library, which reports errors instead of ending the process" ON)
 
 include(cmake/RtcwSources.cmake)
 include(cmake/RtcwModule.cmake)
+if(RTCW_RENDERER_BACKEND STREQUAL "deko3d")
+	include(cmake/RtcwShaders.cmake)
+endif()
 
 # id's code leans on type punning and was written where char is signed, which it is
 # not on arm64: parsers, tables and the network's usercmds all assume it. Frame
@@ -83,7 +87,11 @@ function(rtcw_add_game game output_name)
 		source/platform/snd_nx.c
 	)
 	if(RTCW_RENDERER_BACKEND STREQUAL "deko3d")
-		message(FATAL_ERROR "The deko3D back end is not part of this build yet")
+		list(APPEND platform_sources
+			source/renderer/dkgl.c
+			source/renderer/dk_device.c
+			source/renderer/glimp_dk.c
+		)
 	else()
 		list(APPEND platform_sources source/platform/glimp_gl.c)
 	endif()
@@ -94,6 +102,7 @@ function(rtcw_add_game game output_name)
 	add_dependencies(${output_name} ${RTCW_MODULE_TARGETS})
 	target_include_directories(${output_name} PRIVATE
 		source/platform
+		source/renderer
 		${code}
 		${code}/sys
 	)
@@ -109,7 +118,13 @@ function(rtcw_add_game game output_name)
 		-Wl,--gc-sections
 	)
 	if(RTCW_RENDERER_BACKEND STREQUAL "deko3d")
-		target_link_libraries(${output_name} PRIVATE deko3d jpeg z nx m)
+		target_compile_definitions(${output_name} PRIVATE RTCW_DEKO3D)
+		add_dependencies(${output_name} rtcw_shaders)
+		if(RTCW_DEKO3D_DEBUG)
+			target_link_libraries(${output_name} PRIVATE deko3dd jpeg z nx m)
+		else()
+			target_link_libraries(${output_name} PRIVATE deko3d jpeg z nx m)
+		endif()
 	else()
 		target_link_libraries(${output_name} PRIVATE EGL glapi drm_nouveau jpeg z nx m)
 	endif()
@@ -120,8 +135,13 @@ rtcw_add_game(MP RtCWNX_MP)
 
 nx_generate_nacp(RtCWNX.nacp NAME "${NX_APP_NAME}" AUTHOR "${NX_APP_AUTHOR}" VERSION "${PROJECT_VERSION}")
 nx_generate_nacp(RtCWNX_MP.nacp NAME "${NX_APP_NAME} Multiplayer" AUTHOR "${NX_APP_AUTHOR}" VERSION "${PROJECT_VERSION}")
-nx_create_nro(RtCWNX NACP RtCWNX.nacp ICON "${NX_ICON}")
-nx_create_nro(RtCWNX_MP NACP RtCWNX_MP.nacp ICON "${NX_ICON}")
+if(RTCW_RENDERER_BACKEND STREQUAL "deko3d")
+	nx_create_nro(RtCWNX NACP RtCWNX.nacp ICON "${NX_ICON}" ROMFS rtcw_romfs)
+	nx_create_nro(RtCWNX_MP NACP RtCWNX_MP.nacp ICON "${NX_ICON}" ROMFS rtcw_romfs)
+else()
+	nx_create_nro(RtCWNX NACP RtCWNX.nacp ICON "${NX_ICON}")
+	nx_create_nro(RtCWNX_MP NACP RtCWNX_MP.nacp ICON "${NX_ICON}")
+endif()
 
 # What gets copied to the SD card: see tools/package_sd.py for the game's files.
 add_custom_target(sd_card ALL

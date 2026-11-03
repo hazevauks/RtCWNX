@@ -30,6 +30,10 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "tr_local.h"
 
+#ifdef RTCW_DEKO3D
+#include "dkgl.h"
+#endif
+
 /*
 =============================================================================
 
@@ -353,6 +357,12 @@ void RB_TestFlare( flare_t *f ) {
 	// don't bother with another sync
 	glState.finishCalled = qfalse;
 
+#ifdef RTCW_DEKO3D
+	// asked of the GPU, without stopping it to read the depth back
+	visible = f->cgvisible;
+	if ( !DKGL_FlareVisible( f - r_flareStructs, f->windowX, f->windowY, f->eyeZ ) )
+		visible = qfalse;
+#else
 	// read back the z buffer contents
 #ifdef USE_OPENGLES
 	screenZ = 0;
@@ -367,6 +377,7 @@ void RB_TestFlare( flare_t *f ) {
 
 	if ( -f->eyeZ - -screenZ  > 24 )
 		visible = qfalse;
+#endif
 
 	if ( visible ) {
 		if ( !f->visible ) {
